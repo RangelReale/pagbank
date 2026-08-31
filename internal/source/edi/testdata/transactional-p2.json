@@ -1,0 +1,25 @@
+{
+  "detalhes": [
+    {
+      "movimento_api_codigo": "0009988776657",
+      "estabelecimento": "123456789",
+      "data_inicial_transacao": "2026-08-03",
+      "hora_inicial_transacao": "23:59:59",
+      "tipo_transacao": "VENDA",
+      "tipo_evento": "1",
+      "valor_total_transacao": 12345678901234.99,
+      "valor_liquido_transacao": 12345678901234.99,
+      "taxa_intermediacao": 0.00,
+      "status_pagamento": "1",
+      "meio_pagamento": "PIX",
+      "cartao": { "bin": "", "holder": "", "bandeira": "" },
+      "nsu": "000998879",
+      "split": [],
+      "tags": [],
+      "observacao": null,
+      "conciliado": true,
+      "data_prevista_pagamento": "2026-09-02T10:00:00-03:00"
+    }
+  ],
+  "pagination": { "elements": 1, "page": 2, "totalPages": 2, "totalElements": 3 }
+}

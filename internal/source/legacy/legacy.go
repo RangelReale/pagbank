@@ -168,8 +168,8 @@ func (c *Client) fetchPage(ctx context.Context, w source.Period, page int) (*sea
 
 // explain traduz os erros HTTP mais comuns desta API para algo acionável.
 func explain(err error) error {
-	var se *httpx.StatusError
-	if !errors.As(err, &se) {
+	se, ok := errors.AsType[*httpx.StatusError](err)
+	if !ok {
 		return err
 	}
 	if msgs := parseErrors(se.Body); len(msgs) > 0 {

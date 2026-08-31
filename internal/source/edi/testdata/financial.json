@@ -1,0 +1,12 @@
+{
+  "estabelecimento": "123456789",
+  "movimentacoes": [
+    {
+      "data_liquidacao": "2026-08-06",
+      "tipo": "CREDITO",
+      "valor_bruto": 1499.90,
+      "valor_liquido": 1440.04,
+      "parcela": "1/3"
+    }
+  ]
+}

@@ -219,8 +219,7 @@ func (c *Client) pace(ctx context.Context) error {
 
 // backoff é exponencial com jitter, mas o Retry-After do servidor tem prioridade.
 func (c *Client) backoff(attempt int, err error) time.Duration {
-	var se *StatusError
-	if errors.As(err, &se) && se.retryAfter > 0 {
+	if se, ok := errors.AsType[*StatusError](err); ok && se.retryAfter > 0 {
 		return min(se.retryAfter, c.MaxDelay)
 	}
 	d := c.BaseDelay << (attempt - 2)
@@ -244,8 +243,7 @@ func sleep(ctx context.Context, d time.Duration) error {
 // retryable diz se vale a pena repetir. Erros de rede e de leitura entram;
 // entre os status HTTP, só 429 e os 5xx que não sejam "não implementado".
 func retryable(err error) bool {
-	var se *StatusError
-	if errors.As(err, &se) {
+	if se, ok := errors.AsType[*StatusError](err); ok {
 		switch {
 		case se.StatusCode == http.StatusTooManyRequests:
 			return true

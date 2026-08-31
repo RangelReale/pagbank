@@ -1,0 +1,9 @@
+[
+  {
+    "estabelecimento": "123456789",
+    "data_saldo": "03/08/2026",
+    "saldo_disponivel": 10250.75,
+    "saldo_a_liberar": 8900.10,
+    "saldo_bloqueado": 0.00
+  }
+]

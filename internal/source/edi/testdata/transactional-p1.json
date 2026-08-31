@@ -1,0 +1,46 @@
+{
+  "detalhes": [
+    {
+      "movimento_api_codigo": "0009988776655",
+      "estabelecimento": "123456789",
+      "data_inicial_transacao": "2026-08-03",
+      "hora_inicial_transacao": "15:46:12",
+      "tipo_transacao": "VENDA",
+      "tipo_evento": "1",
+      "valor_total_transacao": 1499.90,
+      "valor_liquido_transacao": 1440.04,
+      "taxa_intermediacao": 59.86,
+      "status_pagamento": "1",
+      "meio_pagamento": "CARTAO_CREDITO",
+      "cartao": { "bin": "012345", "holder": "6789", "bandeira": "VISA" },
+      "nsu": "000998877",
+      "split": [
+        { "conta": "9988", "valor": 100.00 },
+        { "conta": "7766", "valor": 50.00 }
+      ],
+      "tags": ["loja-1", "promo-agosto"],
+      "observacao": null,
+      "conciliado": true
+    },
+    {
+      "movimento_api_codigo": "0009988776656",
+      "estabelecimento": "123456789",
+      "data_inicial_transacao": "2026-08-03",
+      "hora_inicial_transacao": "16:02:00",
+      "tipo_transacao": "CANCELAMENTO",
+      "tipo_evento": "3",
+      "valor_total_transacao": -89.00,
+      "valor_liquido_transacao": -89.00,
+      "taxa_intermediacao": 0.00,
+      "status_pagamento": "5",
+      "meio_pagamento": "BOLETO",
+      "cartao": { "bin": "", "holder": "", "bandeira": "" },
+      "nsu": "000998878",
+      "split": [],
+      "tags": [],
+      "observacao": "estorno solicitado pelo comprador",
+      "conciliado": false
+    }
+  ],
+  "pagination": { "elements": 2, "page": 1, "totalPages": 2, "totalElements": 3 }
+}

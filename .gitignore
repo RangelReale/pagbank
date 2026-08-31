@@ -8,7 +8,7 @@
 *.csv
 !internal/sheet/testdata/**/*.csv
 
-# binários
+# binários — ancorados na raiz, senão a regra casaria com cmd/pagbank-extract/
 /bin/
-pagbank-extract
-pagbank-extract.exe
+/pagbank-extract
+/pagbank-extract.exe

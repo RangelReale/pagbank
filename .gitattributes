@@ -1,2 +1,2 @@
-# Os golden de CSV são comparados byte a byte, incluindo o CRLF e o BOM.
 internal/sheet/testdata/*.csv -text
+internal/source/*/testdata/* -text

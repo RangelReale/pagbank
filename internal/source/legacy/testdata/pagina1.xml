@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<transactionSearchResult>
+  <date>2026-08-31T10:00:00.000-03:00</date>
+  <currentPage>1</currentPage>
+  <resultsInThisPage>2</resultsInThisPage>
+  <totalPages>2</totalPages>
+  <transactions>
+    <transaction>
+      <date>2026-08-03T15:46:12.000-03:00</date>
+      <lastEventDate>2026-08-05T17:39:14.000-03:00</lastEventDate>
+      <code>9E884542-81B3-4419-9A75-BCC6FB495EF1</code>
+      <reference>PEDIDO-1024</reference>
+      <type>1</type>
+      <status>3</status>
+      <paymentMethod>
+        <type>1</type>
+        <code>101</code>
+      </paymentMethod>
+      <grossAmount>1499.90</grossAmount>
+      <discountAmount>0.00</discountAmount>
+      <feeAmount>59.86</feeAmount>
+      <netAmount>1440.04</netAmount>
+      <extraAmount>0.00</extraAmount>
+      <installmentCount>3</installmentCount>
+      <itemCount>2</itemCount>
+    </transaction>
+    <transaction>
+      <date>2026-08-04T09:01:00.000-03:00</date>
+      <lastEventDate>2026-08-04T09:01:30.000-03:00</lastEventDate>
+      <code>A1B2C3D4-0000-4444-8888-FFFFFFFFFFFF</code>
+      <reference>Manutenção de serviço - código ÚNICO</reference>
+      <type>11</type>
+      <status>9</status>
+      <paymentMethod>
+        <type>2</type>
+        <code>202</code>
+      </paymentMethod>
+      <grossAmount>89.00</grossAmount>
+      <discountAmount>9.00</discountAmount>
+      <feeAmount>1.99</feeAmount>
+      <netAmount>78.01</netAmount>
+      <extraAmount>-0.01</extraAmount>
+      <installmentCount>1</installmentCount>
+      <itemCount>1</itemCount>
+    </transaction>
+  </transactions>
+</transactionSearchResult>

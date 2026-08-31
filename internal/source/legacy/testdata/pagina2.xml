@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<transactionSearchResult>
+  <date>2026-08-31T10:00:00.000-03:00</date>
+  <currentPage>2</currentPage>
+  <resultsInThisPage>2</resultsInThisPage>
+  <totalPages>2</totalPages>
+  <transactions>
+    <transaction>
+      <date>2026-08-03T15:46:12.000-03:00</date>
+      <lastEventDate>2026-08-05T17:39:14.000-03:00</lastEventDate>
+      <code>9E884542-81B3-4419-9A75-BCC6FB495EF1</code>
+      <reference>PEDIDO-1024</reference>
+      <type>1</type>
+      <status>3</status>
+      <paymentMethod>
+        <type>1</type>
+        <code>101</code>
+      </paymentMethod>
+      <grossAmount>1499.90</grossAmount>
+      <discountAmount>0.00</discountAmount>
+      <feeAmount>59.86</feeAmount>
+      <netAmount>1440.04</netAmount>
+      <extraAmount>0.00</extraAmount>
+      <installmentCount>3</installmentCount>
+      <itemCount>2</itemCount>
+    </transaction>
+    <transaction>
+      <date>2026-08-20T23:59:59.000-03:00</date>
+      <lastEventDate>2026-08-21T00:00:05.000-03:00</lastEventDate>
+      <code>DEADBEEF-1111-2222-3333-444455556666</code>
+      <reference></reference>
+      <type>4</type>
+      <status>4</status>
+      <paymentMethod>
+        <type>7</type>
+        <code></code>
+      </paymentMethod>
+      <grossAmount>-500.00</grossAmount>
+      <discountAmount>0.00</discountAmount>
+      <feeAmount>0.00</feeAmount>
+      <netAmount>-500.00</netAmount>
+      <extraAmount>0.00</extraAmount>
+      <installmentCount>1</installmentCount>
+      <itemCount>0</itemCount>
+    </transaction>
+  </transactions>
+</transactionSearchResult>

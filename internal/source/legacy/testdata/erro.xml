@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<errors>
+  <error>
+    <code>13005</code>
+    <message>initialDate must be lower than or equal finalDate</message>
+  </error>
+</errors>

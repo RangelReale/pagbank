@@ -1,0 +1,4 @@
+﻿Data;Data/hora;Código;Descrição;Valor bruto;Valor líquido
+01/08/2026;01/08/2026 09:15:42;REF-1;"Venda; à vista";1234,56;1198,12
+02/08/2026;02/08/2026 18:00:00;REF-2;"Estorno ""parcial""";-90,00;-90,00
+;;'=SOMA(A1);;1000;

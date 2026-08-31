@@ -1,0 +1,14 @@
+# credenciais
+.env
+.env.*
+!.env.example
+
+# saída da extração
+/saida/
+*.csv
+!internal/sheet/testdata/**/*.csv
+
+# binários
+/bin/
+pagbank-extract
+pagbank-extract.exe

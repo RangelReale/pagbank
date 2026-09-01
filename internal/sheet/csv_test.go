@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 var update = flag.Bool("update", false, "regrava os arquivos golden em testdata")
@@ -129,5 +130,46 @@ func TestWriteFile(t *testing.T) {
 	}
 	if _, err := os.Stat(path); err != nil {
 		t.Errorf("arquivo não foi criado: %v", err)
+	}
+}
+
+func TestFileNameAtCarimbaDataEHora(t *testing.T) {
+	quando := time.Date(2026, 9, 1, 14, 30, 22, 0, time.UTC)
+	if got, want := FileNameAt("transacoes", quando), "transacoes-2026-09-01_143022.csv"; got != want {
+		t.Errorf("FileNameAt = %q, quero %q", got, want)
+	}
+	// O carimbo entra antes da sanitização, então o nome sujo continua sendo limpo.
+	if got, want := FileNameAt("mov: financeira", quando), "mov__financeira-2026-09-01_143022.csv"; got != want {
+		t.Errorf("FileNameAt = %q, quero %q", got, want)
+	}
+}
+
+func TestWriteFileAsUsaONomeDado(t *testing.T) {
+	dir := t.TempDir()
+	tab := Table{Name: "transacoes", Columns: []Column{{Header: "a"}}, Rows: [][]string{{"1"}}}
+
+	// Duas gravações com carimbos diferentes não podem se sobrescrever: é para
+	// isso que a interface web usa WriteFileAs em vez de WriteFile.
+	var caminhos []string
+	for _, quando := range []time.Time{
+		time.Date(2026, 9, 1, 14, 30, 22, 0, time.UTC),
+		time.Date(2026, 9, 1, 14, 31, 5, 0, time.UTC),
+	} {
+		path, err := WriteFileAs(dir, FileNameAt(tab.Name, quando), tab, DefaultOptions())
+		if err != nil {
+			t.Fatalf("WriteFileAs: %v", err)
+		}
+		caminhos = append(caminhos, path)
+	}
+
+	if got, want := filepath.Base(caminhos[0]), "transacoes-2026-09-01_143022.csv"; got != want {
+		t.Errorf("nome = %q, quero %q", got, want)
+	}
+	entradas, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entradas) != 2 {
+		t.Errorf("%d arquivo(s) em %s, quero 2", len(entradas), dir)
 	}
 }

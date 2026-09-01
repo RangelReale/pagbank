@@ -71,10 +71,17 @@ func Write(w io.Writer, t Table, opt Options) error {
 
 // WriteFile grava a tabela em dir/<nome>.csv e devolve o caminho do arquivo.
 func WriteFile(dir string, t Table, opt Options) (string, error) {
+	return WriteFileAs(dir, FileName(t.Name), t, opt)
+}
+
+// WriteFileAs grava a tabela em dir/arquivo. Existe separada de WriteFile porque
+// a interface web carimba data e hora no nome: lá duas extrações seguidas são o
+// caso comum, e a segunda não pode apagar a primeira.
+func WriteFileAs(dir, arquivo string, t Table, opt Options) (string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	path := filepath.Join(dir, FileName(t.Name))
+	path := filepath.Join(dir, arquivo)
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err
@@ -105,6 +112,13 @@ func FileName(name string) string {
 		safe = "tabela"
 	}
 	return safe + ".csv"
+}
+
+// FileNameAt é o FileName com a data e a hora no fim: "transacoes" gerada em
+// 1/9/2026 às 14:30:22 vira "transacoes-2026-09-01_143022.csv". O carimbo separa
+// uma extração da seguinte, que na interface web caem todas na mesma pasta.
+func FileNameAt(name string, quando time.Time) string {
+	return FileName(name + "-" + quando.Format("2006-01-02_150405"))
 }
 
 func format(v string, kind Kind, opt Options) string {

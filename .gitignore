@@ -8,7 +8,7 @@
 # saída da extração
 /saida/
 *.csv
-!internal/sheet/testdata/**/*.csv
+!**/testdata/**/*.csv
 
 # binários — ancorados na raiz, senão a regra casaria com cmd/pagbank-extract/
 /bin/

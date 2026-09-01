@@ -1,0 +1,4 @@
+﻿Data do movimento;movimento_api_codigo;estabelecimento;data_inicial_transacao;hora_inicial_transacao;tipo_transacao;tipo_evento;valor_total_transacao;valor_liquido_transacao;taxa_intermediacao;status_pagamento;meio_pagamento;cartao.bin;cartao.holder;cartao.bandeira;nsu;split[1].conta;split[1].valor;split[2].conta;split[2].valor;tags;observacao;conciliado;data_prevista_pagamento
+03/08/2026;0009988776655;123456789;03/08/2026;15:46:12;VENDA;1;1499,90;1440,04;59,86;1;CARTAO_CREDITO;012345;6789;VISA;000998877;9988;100,00;7766;50,00;loja-1 | promo-agosto;;true;
+03/08/2026;0009988776656;123456789;03/08/2026;16:02:00;CANCELAMENTO;3;-89,00;-89,00;0,00;5;BOLETO;;;;000998878;;;;;;estorno solicitado pelo comprador;false;
+03/08/2026;0009988776657;123456789;03/08/2026;23:59:59;VENDA;1;12345678901234,99;12345678901234,99;0,00;1;PIX;;;;000998879;;;;;;;true;02/09/2026 10:00:00

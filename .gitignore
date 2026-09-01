@@ -4,6 +4,7 @@
 .env
 .env.*
 !.env.example
+config.env
 
 # saída da extração
 /saida/
@@ -17,3 +18,5 @@
 /bin/
 /pagbank-extract
 /pagbank-extract.exe
+/PagBank-Extrator
+/PagBank-Extrator.exe

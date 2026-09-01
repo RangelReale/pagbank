@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<transactionSearchResult>
+  <date>2026-09-01T10:00:00.000-03:00</date>
+  <currentPage>1</currentPage>
+  <resultsInThisPage>2</resultsInThisPage>
+  <totalPages>1</totalPages>
+  <transactions>
+    <transaction>
+      <date>2026-08-31T16:04:05.000-03:00</date>
+      <code>E56B1AB8-91B0-427B-9059-EEEE1BD69BD9</code>
+      <type>1</type>
+      <status>3</status>
+      <paymentMethod>
+        <type>1</type>
+      </paymentMethod>
+      <grossAmount>48.00</grossAmount>
+      <discountAmount>0.00</discountAmount>
+      <feeAmount>0.96</feeAmount>
+      <netAmount>47.04</netAmount>
+      <extraAmount>0.00</extraAmount>
+    </transaction>
+    <transaction>
+      <date>2026-08-31T16:30:20.000-03:00</date>
+      <code>3871BE90-BB3B-5CD7-8D15-CBB20FA8A636</code>
+      <type>1</type>
+      <status>4</status>
+      <paymentMethod>
+        <type>11</type>
+      </paymentMethod>
+      <grossAmount>496.64</grossAmount>
+      <discountAmount>0.00</discountAmount>
+      <feeAmount>2.48</feeAmount>
+      <netAmount>494.16</netAmount>
+      <extraAmount>0.00</extraAmount>
+    </transaction>
+  </transactions>
+</transactionSearchResult>

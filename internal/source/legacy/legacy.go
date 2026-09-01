@@ -57,6 +57,11 @@ type Client struct {
 	BaseURL string
 	Email   string
 	Token   string
+	// SemDetalhes pula a consulta de detalhe de cada transação. A busca por data
+	// devolve só um resumo: última atualização, código do meio de pagamento,
+	// parcelas e itens existem apenas em /v2/transactions/{código}, e buscá-los
+	// custa uma requisição por transação. Pular deixa essas colunas em branco.
+	SemDetalhes bool
 	// Logf, quando definido, reporta o progresso (janela e página).
 	Logf func(format string, args ...any)
 	// Now existe para o teste fixar "hoje" ao validar o limite de histórico.
@@ -88,7 +93,8 @@ func (c *Client) logf(format string, args ...any) {
 }
 
 // Fetch busca todas as transações do período, fatiando-o em janelas de trinta
-// dias e percorrendo as páginas de cada janela.
+// dias e percorrendo as páginas de cada janela. Com Detalhes, cada transação
+// ainda passa pelo endpoint de detalhe antes de virar linha.
 func (c *Client) Fetch(ctx context.Context, p source.Period) (*source.Result, error) {
 	res := &source.Result{}
 	if err := c.checkHistory(p, res); err != nil {
@@ -99,7 +105,26 @@ func (c *Client) Fetch(ctx context.Context, p source.Period) (*source.Result, er
 		return nil, err
 	}
 
+	txs, err := c.buscar(ctx, p, res)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.detalhar(ctx, txs, res); err != nil {
+		return nil, err
+	}
+
 	b := sheet.NewBuilder(TableName)
+	for _, t := range txs {
+		appendTransaction(b, t)
+	}
+	res.Tables = []sheet.Table{b.Build()}
+	return res, nil
+}
+
+// buscar percorre as janelas e as páginas, devolvendo as transações na ordem em
+// que a API as entregou.
+func (c *Client) buscar(ctx context.Context, p source.Period, res *source.Result) ([]transaction, error) {
+	var txs []transaction
 	vistos := make(map[string]bool)
 	duplicadas := 0
 
@@ -119,7 +144,7 @@ func (c *Client) Fetch(ctx context.Context, p source.Period) (*source.Result, er
 					continue
 				}
 				vistos[t.Code] = true
-				appendTransaction(b, t)
+				txs = append(txs, t)
 			}
 
 			if page >= r.TotalPages || len(r.Transactions) == 0 {
@@ -131,8 +156,81 @@ func (c *Client) Fetch(ctx context.Context, p source.Period) (*source.Result, er
 	if duplicadas > 0 {
 		res.Warnf("%d transação(ões) repetida(s) entre páginas foram descartadas pelo código", duplicadas)
 	}
-	res.Tables = []sheet.Table{b.Build()}
-	return res, nil
+	return txs, nil
+}
+
+// detalhar completa cada transação com o que a busca por data não devolve.
+//
+// A resposta de /v2/transactions é um resumo: lastEventDate, o código do meio de
+// pagamento, installmentCount e itemCount só aparecem em /v2/transactions/{código}.
+// É uma requisição a mais por transação, e quem não quiser pagar isso passa
+// SemDetalhes — caso em que o aviso registra quais colunas sairão vazias.
+func (c *Client) detalhar(ctx context.Context, txs []transaction, res *source.Result) error {
+	if len(txs) == 0 {
+		return nil
+	}
+	if c.SemDetalhes {
+		res.Warnf("sem o detalhe das transações, as colunas de última atualização, detalhe do meio " +
+			"de pagamento, parcelas e itens saem em branco: a consulta por data devolve só um " +
+			"resumo de cada transação")
+		return nil
+	}
+
+	falhas := 0
+	var primeira error
+	for i := range txs {
+		if txs[i].Code == "" {
+			continue
+		}
+		c.logf("detalhe %d/%d: %s", i+1, len(txs), txs[i].Code)
+		d, err := c.fetchDetail(ctx, txs[i].Code)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			// Uma transação sem detalhe não invalida as outras: a linha fica com
+			// o que o resumo trouxe, que é o dado autoritativo de qualquer forma.
+			falhas++
+			if primeira == nil {
+				primeira = fmt.Errorf("transação %s: %w", txs[i].Code, err)
+			}
+			continue
+		}
+		txs[i] = merge(txs[i], *d)
+	}
+
+	if falhas > 0 {
+		res.Warnf("%d transação(ões) ficaram sem detalhe e mantiveram só os dados do resumo; a primeira falha foi: %v", falhas, primeira)
+	}
+	return nil
+}
+
+// merge completa o resumo com o detalhe campo a campo, sem sobrescrever nada que
+// já tenha vindo preenchido. O detalhe é mais completo, mas uma resposta parcial
+// não pode apagar dado que a busca por data trouxe.
+func merge(resumo, detalhe transaction) transaction {
+	for _, par := range [][2]*string{
+		{&resumo.Date, &detalhe.Date},
+		{&resumo.LastEventDate, &detalhe.LastEventDate},
+		{&resumo.Code, &detalhe.Code},
+		{&resumo.Reference, &detalhe.Reference},
+		{&resumo.Type, &detalhe.Type},
+		{&resumo.Status, &detalhe.Status},
+		{&resumo.PaymentMethod.Type, &detalhe.PaymentMethod.Type},
+		{&resumo.PaymentMethod.Code, &detalhe.PaymentMethod.Code},
+		{&resumo.GrossAmount, &detalhe.GrossAmount},
+		{&resumo.DiscountAmount, &detalhe.DiscountAmount},
+		{&resumo.FeeAmount, &detalhe.FeeAmount},
+		{&resumo.NetAmount, &detalhe.NetAmount},
+		{&resumo.ExtraAmount, &detalhe.ExtraAmount},
+		{&resumo.InstallmentCount, &detalhe.InstallmentCount},
+		{&resumo.ItemCount, &detalhe.ItemCount},
+	} {
+		if *par[0] == "" {
+			*par[0] = *par[1]
+		}
+	}
+	return resumo
 }
 
 // checkHistory avisa — ou recusa — quando o período pedido está fora do que a
@@ -217,6 +315,26 @@ func (c *Client) finalDate(w source.Period) string {
 	return fim.Format("2006-01-02T15:04:05")
 }
 
+// fetchDetail busca uma transação pelo código. É o único lugar onde a API
+// devolve a transação inteira — a busca por data traz só um resumo dela.
+func (c *Client) fetchDetail(ctx context.Context, code string) (*transaction, error) {
+	q := url.Values{}
+	q.Set("email", c.Email)
+	q.Set("token", c.Token)
+
+	u := c.BaseURL + "/v2/transactions/" + url.PathEscape(code) + "?" + q.Encode()
+	resp, err := c.HTTP.Get(ctx, u, http.Header{"Accept": {"application/xml;charset=ISO-8859-1"}})
+	if err != nil {
+		return nil, explain(err)
+	}
+
+	var d transactionDetail
+	if err := decodeXML(resp.Body, &d); err != nil {
+		return nil, fmt.Errorf("resposta XML inesperada: %w", err)
+	}
+	return &d.transaction, nil
+}
+
 // explain traduz os erros HTTP mais comuns desta API para algo acionável.
 func explain(err error) error {
 	se, ok := errors.AsType[*httpx.StatusError](err)
@@ -246,6 +364,13 @@ type searchResult struct {
 	ResultsInThisPage int           `xml:"resultsInThisPage"`
 	TotalPages        int           `xml:"totalPages"`
 	Transactions      []transaction `xml:"transactions>transaction"`
+}
+
+// transactionDetail é a resposta de /v2/transactions/{código}: a mesma transação
+// da busca por data, com os campos que ela omite.
+type transactionDetail struct {
+	XMLName xml.Name `xml:"transaction"`
+	transaction
 }
 
 type transaction struct {

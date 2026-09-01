@@ -77,6 +77,9 @@ pagbank-extract edi --from 2026-08-01 --types financial,balances --out ./agosto
 
 # Vendas dos últimos dias pela API legada, com progresso
 pagbank-extract transacoes --from 2026-08-25 -v
+
+# Só o resumo das vendas, sem a segunda passada de detalhe — bem mais rápido
+pagbank-extract transacoes --from 2026-08-25 --sem-detalhes
 ```
 
 `--to` é opcional e vale hoje. `--out` é opcional e vale `saida/`.
@@ -89,6 +92,31 @@ Os arquivos gerados:
 | `transacoes` | `transacoes.csv` |
 
 Rode `pagbank-extract help`, ou `pagbank-extract edi -h`, para todas as flags.
+
+### O detalhe das transações
+
+A consulta por data da API legada devolve um **resumo** de cada transação. Quatro campos não
+vêm nela e só existem em `/v2/transactions/{código}`:
+
+| Coluna do CSV | Campo da API |
+|---|---|
+| Última atualização | `lastEventDate` |
+| Meio de pagamento (detalhe) | `paymentMethod/code` |
+| Parcelas | `installmentCount` |
+| Itens | `itemCount` |
+
+Por isso o `transacoes` busca cada transação uma segunda vez, pelo código — é o que preenche
+essas colunas. Custa uma requisição a mais por transação, espaçadas para não esbarrar no limite
+da API: conte alguns minutos num mês de muitas vendas.
+
+`--sem-detalhes` pula essa segunda passada. A extração fica na velocidade de uma requisição por
+página de mil transações, e as quatro colunas acima saem em branco — com um aviso dizendo isso.
+
+Uma transação cujo detalhe falhe não derruba a extração nem some do CSV: a linha fica com o que
+o resumo trouxe, e o total de falhas vira aviso no fim.
+
+(A coluna `Referência` também costuma sair vazia, mas isso não é limitação da consulta: venda de
+maquininha não tem código de pedido externo.)
 
 ## O CSV
 
@@ -133,6 +161,9 @@ Em ambos os casos **a coluna com o valor cru é a autoritativa**: nada é descar
   API responde para data anterior à ativação do EDI.
 - `transações repetidas descartadas` — a paginação da API legada corre sobre dados vivos, e a
   mesma transação pode reaparecer em outra página. A deduplicação é pelo código da transação.
+- `sem o detalhe das transações, as colunas ... saem em branco` — `--sem-detalhes` foi usado.
+- `N transação(ões) ficaram sem detalhe` — a consulta do detalhe falhou para essas; as linhas
+  ficaram com os dados do resumo. Rodar de novo costuma resolver.
 - `o período termina no futuro` — a API legada não responde por datas futuras, e o resto do dia
   de hoje é futuro: a consulta é cortada no instante atual. Rodar de novo mais tarde traz as
   vendas que faltavam.

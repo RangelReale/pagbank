@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?>
+<transaction>
+  <date>2026-08-31T16:30:20.000-03:00</date>
+  <lastEventDate>2026-08-31T16:31:02.000-03:00</lastEventDate>
+  <code>3871BE90-BB3B-5CD7-8D15-CBB20FA8A636</code>
+  <type>1</type>
+  <status>4</status>
+  <paymentMethod>
+    <type>11</type>
+    <code>111</code>
+  </paymentMethod>
+  <grossAmount>496.64</grossAmount>
+  <discountAmount>0.00</discountAmount>
+  <feeAmount>2.48</feeAmount>
+  <netAmount>494.16</netAmount>
+  <extraAmount>0.00</extraAmount>
+  <installmentCount>1</installmentCount>
+  <itemCount>1</itemCount>
+</transaction>

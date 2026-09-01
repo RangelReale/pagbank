@@ -62,6 +62,9 @@ func servidor(t *testing.T, h http.HandlerFunc) (*Client, *[]url.Values) {
 	c := New(cfg, hc)
 	// "Hoje" fixo: o limite de seis meses não pode depender da data real.
 	c.Now = func() time.Time { return time.Date(2026, 8, 31, 0, 0, 0, 0, time.UTC) }
+	// Estes testes olham só a busca por data; o detalhe tem servidor próprio em
+	// detalhe_test.go, e deixá-lo ligado aqui poluiria cada handler.
+	c.SemDetalhes = true
 	return c, &pedidos
 }
 
@@ -102,7 +105,8 @@ func TestFetchPaginaEDeduplica(t *testing.T) {
 	if got := res.Records(); got != 3 {
 		t.Errorf("registros = %d, quero 3", got)
 	}
-	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "repetida") {
+	// Dois avisos: a duplicata e o lembrete das colunas que ficam em branco.
+	if len(res.Warnings) != 2 || !strings.Contains(res.Warnings[0], "repetida") {
 		t.Errorf("avisos = %v, quero um sobre duplicata", res.Warnings)
 	}
 	if len(*pedidos) != 2 {

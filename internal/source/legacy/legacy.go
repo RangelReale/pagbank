@@ -154,7 +154,10 @@ func (c *Client) fetchPage(ctx context.Context, w source.Period, page int) (*sea
 	q.Set("maxPageResults", fmt.Sprint(maxPageResults))
 
 	u := c.BaseURL + "/v2/transactions?" + q.Encode()
-	resp, err := c.HTTP.Get(ctx, u, http.Header{"Accept": {"application/xml"}})
+	// O charset é obrigatório no Accept: o RESTEasy antigo que serve esta API
+	// compara o media type com os parâmetros, e "application/xml" puro devolve
+	// 406 Not Acceptable.
+	resp, err := c.HTTP.Get(ctx, u, http.Header{"Accept": {"application/xml;charset=ISO-8859-1"}})
 	if err != nil {
 		return nil, explain(err)
 	}
@@ -181,6 +184,8 @@ func explain(err error) error {
 			se.StatusCode, config.EnvEmail, config.EnvToken)
 	case http.StatusNotFound:
 		return fmt.Errorf("endpoint não encontrado (404): confira %s", config.EnvLegacyBaseURL)
+	case http.StatusNotAcceptable:
+		return fmt.Errorf("o PagBank recusou o formato pedido (406): esta API só responde ao Accept \"application/xml;charset=ISO-8859-1\"")
 	}
 	return err
 }

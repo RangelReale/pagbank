@@ -134,6 +134,28 @@ func TestFetchEnviaAsCredenciaisEOIntervalo(t *testing.T) {
 	}
 }
 
+func TestFetchEnviaAcceptComCharset(t *testing.T) {
+	var mu sync.Mutex
+	var accept string
+	c, _ := servidor(t, func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		accept = r.Header.Get("Accept")
+		mu.Unlock()
+		w.Write(fixture(t, "vazia.xml"))
+	})
+
+	if _, err := c.Fetch(context.Background(), periodo(t, "2026-08-01", "2026-08-01")); err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	// Sem o charset a API de produção responde 406: o RESTEasy dela compara o
+	// media type com os parâmetros.
+	if want := "application/xml;charset=ISO-8859-1"; accept != want {
+		t.Errorf("Accept = %q, quero %q", accept, want)
+	}
+}
+
 func TestFetchFatiaEmJanelasDeTrintaDias(t *testing.T) {
 	c, pedidos := servidor(t, func(w http.ResponseWriter, r *http.Request) {
 		w.Write(fixture(t, "vazia.xml"))

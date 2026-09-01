@@ -44,18 +44,35 @@ func main() {
 	dir := flag.String("dir", "", "pasta onde ficam o config.env e os CSVs (padrão: a do executável; serve para desenvolvimento e para rodar de uma pasta somente leitura)")
 	flag.Parse()
 
-	if err := run(*dir); err != nil {
+	err := run(opcoes{
+		dir:   *dir,
+		abrir: abrirNavegador,
+		// Com -H=windowsgui o stdout não vai a lugar nenhum, mas quem rodar o
+		// programa com a saída redirecionada — o suporte, um script — recebe o
+		// endereço mesmo assim.
+		pronto: func(u string) { fmt.Println(u) },
+	})
+	if err != nil {
 		avisar(titulo, err.Error())
 		os.Exit(1)
 	}
 }
 
-func run(override string) error {
+// opcoes é o que o main injeta e o teste ponta a ponta substitui: sem isso não
+// há como exercitar o programa inteiro sem abrir o navegador de quem roda os
+// testes.
+type opcoes struct {
+	dir    string
+	abrir  func(url string) error
+	pronto func(url string)
+}
+
+func run(o opcoes) error {
 	// Fechar a janela ou um Ctrl+C, quando houver console, encerram tudo.
 	ctx, pararSinal := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer pararSinal()
 
-	pasta, err := pastaDeTrabalho(override)
+	pasta, err := pastaDeTrabalho(o.dir)
 	if err != nil {
 		return err
 	}
@@ -116,9 +133,12 @@ func run(override string) error {
 		// tempo inteiro da extração, e um prazo global o cortaria no meio.
 	}
 
+	if o.pronto != nil {
+		o.pronto(endereco)
+	}
 	// Falhar aqui não é fatal: passados vinte segundos sem ninguém abrir a
 	// página, o próprio servidor mostra o endereço numa caixa de mensagem.
-	go func() { _ = abrirNavegador(endereco) }()
+	go func() { _ = o.abrir(endereco) }()
 
 	erros := make(chan error, 1)
 	go func() { erros <- srv.Serve(ln) }()

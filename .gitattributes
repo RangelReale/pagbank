@@ -1,2 +1,7 @@
 internal/sheet/testdata/*.csv -text
 internal/source/*/testdata/* -text
+
+# A página é embutida no binário com //go:embed: se o core.autocrlf a deixasse
+# com CRLF no Windows e LF no Linux, os bytes do executável mudariam com o
+# sistema de quem compilou.
+internal/web/*.html -text

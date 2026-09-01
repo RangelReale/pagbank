@@ -3,18 +3,24 @@ version: '3'
 
 vars:
   BIN: pagbank-extract
+  # O nome que o usuario final ve no Explorer. Sem espaco: o interpretador do
+  # Task quebraria em duas palavras, e sem ganho nenhum para quem so da um
+  # duplo clique.
+  BIN_WEB: PagBank-Extrator
   SAIDA: saida
   EXE: '{{if eq OS "windows"}}.exe{{end}}'
   ALVO: '{{.SAIDA}}/{{.BIN}}{{.EXE}}'
+  ALVO_WEB: '{{.SAIDA}}/{{.BIN_WEB}}{{.EXE}}'
 
 tasks:
   default:
-    desc: Compila o executável
+    desc: Compila os dois executáveis
     cmds:
       - task: build
+      - task: build:web
 
   build:
-    desc: Compila o executável em saida/
+    desc: Compila o executável de linha de comando em saida/
     cmds:
       # saida/ é ignorada pelo git, então num clone novo ela não existe — e o
       # interpretador do Task não tem mkdir embutido.
@@ -30,11 +36,41 @@ tasks:
     generates:
       - '{{.ALVO}}'
 
+  build:web:
+    desc: Compila a interface web em saida/
+    cmds:
+      - cmd: powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '{{.SAIDA}}' | Out-Null"
+        platforms: [windows]
+      - cmd: mkdir -p {{.SAIDA}}
+        platforms: [linux, darwin]
+      # -H=windowsgui: o duplo clique no Explorer não pode abrir janela de
+      # terminal. Sem ele o usuário final ganha um console preto junto com o
+      # navegador.
+      - cmd: go build -ldflags="-H=windowsgui" -o {{.ALVO_WEB}} ./cmd/pagbank-web
+        platforms: [windows]
+      - cmd: go build -o {{.ALVO_WEB}} ./cmd/pagbank-web
+        platforms: [linux, darwin]
+    sources:
+      # O .html entra na lista porque ele é embutido no binário: sem isso,
+      # editar a página não invalida a impressão digital do Task e o build
+      # seguinte devolve o binário velho, em silêncio.
+      - '**/*.go'
+      - '**/*.html'
+      - go.mod
+    generates:
+      - '{{.ALVO_WEB}}'
+
   run:
     desc: 'Compila e executa: task run -- transacoes --from 2026-08-01'
     deps: [build]
     cmds:
       - '{{.ALVO}} {{.CLI_ARGS}}'
+
+  run:web:
+    desc: 'Compila e abre a interface web na pasta atual'
+    deps: [build:web]
+    cmds:
+      - '{{.ALVO_WEB}} -dir . {{.CLI_ARGS}}'
 
   test:
     desc: Roda os testes (tudo offline)
@@ -52,9 +88,9 @@ tasks:
       - go vet ./...
 
   clean:
-    desc: Remove o executável de saida/ (não mexe nos CSVs)
+    desc: Remove os executáveis de saida/ (não mexe nos CSVs)
     cmds:
-      - cmd: powershell -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue '{{.ALVO}}'"
+      - cmd: powershell -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue '{{.ALVO}}','{{.ALVO_WEB}}'"
         platforms: [windows]
-      - cmd: rm -f {{.ALVO}}
+      - cmd: rm -f {{.ALVO}} {{.ALVO_WEB}}
         platforms: [linux, darwin]

@@ -41,6 +41,10 @@ const (
 	// aba fechou. A folga existe porque recarregar a página derruba a conexão
 	// por um instante.
 	esperaSemClientePadrao = 30 * time.Second
+	// esperaSemJanelaPadrao é a folga entre o processo do navegador terminar e o
+	// programa desistir. Curta: se a página não voltou nesse tempo, o processo
+	// que morreu era mesmo o da janela.
+	esperaSemJanelaPadrao = 2 * time.Second
 	// intervaloDoBatimento espaça os comentários que mantêm o fluxo /vivo
 	// escrevendo — é a escrita que falha quando a aba some.
 	intervaloDoBatimento = 15 * time.Second
@@ -105,6 +109,7 @@ type Opcoes struct {
 
 	EsperaPrimeiroCliente time.Duration
 	EsperaSemCliente      time.Duration
+	EsperaSemJanela       time.Duration
 }
 
 // Servidor atende a interface web. Use sempre o ponteiro: ele guarda um mutex.
@@ -119,8 +124,12 @@ type Servidor struct {
 
 	mu       sync.Mutex
 	clientes int
-	primeiro *time.Timer
-	ocioso   *time.Timer
+	// houveCliente lembra que a página chegou a abrir alguma vez. É o que
+	// separa "a janela fechou" de "o navegador ainda nem terminou de subir".
+	houveCliente bool
+	primeiro     *time.Timer
+	ocioso       *time.Timer
+	semJanela    *time.Timer
 }
 
 // New monta o servidor. O handler devolvido serve tudo: página, batimento e
@@ -143,6 +152,9 @@ func New(o Opcoes) *Servidor {
 	}
 	if o.EsperaSemCliente == 0 {
 		o.EsperaSemCliente = esperaSemClientePadrao
+	}
+	if o.EsperaSemJanela == 0 {
+		o.EsperaSemJanela = esperaSemJanelaPadrao
 	}
 
 	s := &Servidor{o: o, mux: http.NewServeMux()}
@@ -226,6 +238,11 @@ func (s *Servidor) entrouCliente() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.clientes++
+	s.houveCliente = true
+	if s.semJanela != nil {
+		s.semJanela.Stop()
+		s.semJanela = nil
+	}
 	if s.primeiro != nil {
 		s.primeiro.Stop()
 		s.primeiro = nil
@@ -255,6 +272,30 @@ func (s *Servidor) talvezEncerrar() {
 	}
 }
 
+// SemJanela avisa que o processo do navegador que abrimos terminou.
+//
+// Não encerra na hora, e isso não é excesso de zelo: o Chromium sai e volta
+// sozinho em várias situações — ao criar o perfil na primeira execução, ao se
+// recuperar de um perfil que ficou sujo, ao repassar a linha de comando para
+// uma instância existente. Nesses casos o processo que lançamos morre em
+// milissegundos e a janela é aberta por outro, e desligar o servidor aqui o
+// mataria antes de a página chegar a carregar: a janela abriria em cima de um
+// "não consigo chegar a esta página".
+//
+// Por isso o fim do processo só vale como sinal depois que a página abriu ao
+// menos uma vez, e ainda assim só se não houver ninguém conectado agora.
+func (s *Servidor) SemJanela() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.houveCliente || s.semJanela != nil {
+		return
+	}
+	// Quem decide é o talvezEncerrar, quando o prazo vencer, e não este if: a
+	// conexão da página que acabou de morrer junto com a janela pode ainda não
+	// ter sido desmontada aqui, e desistir por causa disso perderia o sinal.
+	s.semJanela = time.AfterFunc(s.o.EsperaSemJanela, s.talvezEncerrar)
+}
+
 // ninguemAbriu mostra a URL fora do navegador quando ele não subiu sozinho —
 // política de grupo, navegador padrão quebrado, rundll32 bloqueado. O servidor
 // continua de pé: a URL colada à mão funciona.
@@ -268,12 +309,12 @@ func (s *Servidor) ninguemAbriu() {
 func (s *Servidor) Parar() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, t := range []*time.Timer{s.primeiro, s.ocioso} {
+	for _, t := range []*time.Timer{s.primeiro, s.ocioso, s.semJanela} {
 		if t != nil {
 			t.Stop()
 		}
 	}
-	s.primeiro, s.ocioso = nil, nil
+	s.primeiro, s.ocioso, s.semJanela = nil, nil, nil
 }
 
 // credenciais relê o config.env a cada requisição, e não uma vez na subida: o

@@ -120,17 +120,18 @@ func opcoesDeTeste(t *testing.T) Opcoes {
 		Fonte:                 fabricaDe(&fonteFake{}),
 		EsperaPrimeiroCliente: time.Hour,
 		EsperaSemCliente:      time.Hour,
+		EsperaSemJanela:       10 * time.Millisecond,
 	}
 }
 
 // servidor sobe a interface e devolve o endereço e a pasta de trabalho.
-func servidor(t *testing.T, o Opcoes) (*httptest.Server, string) {
+func servidor(t *testing.T, o Opcoes) (*httptest.Server, *Servidor) {
 	t.Helper()
 	s := New(o)
 	t.Cleanup(s.Parar)
 	srv := httptest.NewServer(s)
 	t.Cleanup(srv.Close)
-	return srv, o.Dir
+	return srv, s
 }
 
 // evento é um evento SSE já separado em nome e carga.
@@ -198,7 +199,9 @@ func encerrador() (func(), chan struct{}) {
 }
 
 func TestPaginaPedeCredencialQuandoFaltaConfig(t *testing.T) {
-	srv, dir := servidor(t, opcoesDeTeste(t))
+	o := opcoesDeTeste(t)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 
 	resp, err := http.Get(srv.URL + "/?t=" + testToken)
 	if err != nil {
@@ -220,7 +223,8 @@ func TestPaginaPedeCredencialQuandoFaltaConfig(t *testing.T) {
 
 func TestPaginaMostraOFormularioComCredencial(t *testing.T) {
 	o := opcoesDeTeste(t)
-	srv, dir := servidor(t, o)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	resp, err := http.Get(srv.URL + "/?t=" + testToken)
@@ -287,7 +291,9 @@ func TestModeloGeradoEValido(t *testing.T) {
 }
 
 func TestExtrairGravaCSVComDataEHoraNoNome(t *testing.T) {
-	srv, dir := servidor(t, opcoesDeTeste(t))
+	o := opcoesDeTeste(t)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	resp := pedirExtracao(t, srv, "2026-08-01", "2026-08-31")
@@ -319,7 +325,8 @@ func TestFimCarregaOsAvisos(t *testing.T) {
 		Tables:   []sheet.Table{tabelaExemplo()},
 		Warnings: []string{"o período começa antes do limite de 6 meses da API legada"},
 	}})
-	srv, dir := servidor(t, o)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	resp := pedirExtracao(t, srv, "2026-08-01", "2026-08-31")
@@ -344,7 +351,8 @@ func TestProgressoDetalheVemComFeitosETotal(t *testing.T) {
 		progresso(1, 2)
 		progresso(2, 2)
 	}})
-	srv, dir := servidor(t, o)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	resp := pedirExtracao(t, srv, "2026-08-01", "2026-08-31")
@@ -381,7 +389,8 @@ func TestSegredoNaoVazaNoProgresso(t *testing.T) {
 		// dentro levar a URL da API, o token vem na query string.
 		logf("GET https://ws.pagseguro.uol.com.br/v2/transactions?token=%s", testSenha)
 	}})
-	srv, dir := servidor(t, o)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	resp := pedirExtracao(t, srv, "2026-08-01", "2026-08-31")
@@ -460,7 +469,8 @@ func TestSegundaExtracaoSimultaneaAvisa(t *testing.T) {
 	entrou, liberar := make(chan struct{}), make(chan struct{})
 	o := opcoesDeTeste(t)
 	o.Fonte = fabricaDe(&fonteFake{entrou: entrou, liberar: liberar})
-	srv, dir := servidor(t, o)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	primeira := pedirExtracao(t, srv, "2026-08-01", "2026-08-31")
@@ -480,7 +490,9 @@ func TestSegundaExtracaoSimultaneaAvisa(t *testing.T) {
 }
 
 func TestDataFinalAnteriorNaoCitaFlag(t *testing.T) {
-	srv, dir := servidor(t, opcoesDeTeste(t))
+	o := opcoesDeTeste(t)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	resp := pedirExtracao(t, srv, "2026-08-31", "2026-08-01")
@@ -513,7 +525,8 @@ func TestFecharAAbaCancelaAExtracao(t *testing.T) {
 	entrou, cancelo := make(chan struct{}), make(chan struct{})
 	o := opcoesDeTeste(t)
 	o.Fonte = fabricaDe(&fonteFake{entrou: entrou, liberar: make(chan struct{}), cancelo: cancelo})
-	srv, dir := servidor(t, o)
+	srv, _ := servidor(t, o)
+	dir := o.Dir
 	comConfig(t, dir)
 
 	ctx, cancelar := context.WithCancel(context.Background())
@@ -632,5 +645,70 @@ func TestDuracaoEmPortugues(t *testing.T) {
 		if got := duracaoEmPortugues(c.d); got != c.quero {
 			t.Errorf("duracaoEmPortugues(%s) = %q, quero %q", c.d, got, c.quero)
 		}
+	}
+}
+
+// Os três testes abaixo prendem o mesmo defeito, que já apareceu de verdade: o
+// processo do Chromium que lançamos morre em milissegundos quando ele precisa
+// criar o perfil, recuperar um perfil sujo ou repassar a linha de comando para
+// uma instância existente. Desligar o servidor nessa hora deixa a janela abrir
+// em cima de um "não consigo chegar a esta página".
+
+func TestSemJanelaNaoEncerraAntesDaPaginaAbrir(t *testing.T) {
+	o := opcoesDeTeste(t)
+	o.Encerrar = func() { t.Error("encerrou antes de a página abrir alguma vez") }
+	s := New(o)
+	defer s.Parar()
+
+	s.SemJanela()
+	time.Sleep(20 * o.EsperaSemJanela)
+}
+
+func TestSemJanelaNaoEncerraComAPaginaAberta(t *testing.T) {
+	o := opcoesDeTeste(t)
+	o.Encerrar = func() { t.Error("encerrou com a página aberta") }
+	srv, s := servidor(t, o)
+
+	ctx, cancelar := context.WithCancel(context.Background())
+	defer cancelar()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/vivo?t="+testToken, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	// O processo que lançamos morreu, mas quem abriu a janela foi outro.
+	s.SemJanela()
+	time.Sleep(20 * o.EsperaSemJanela)
+}
+
+func TestSemJanelaEncerraDepoisQueAPaginaFechou(t *testing.T) {
+	encerrar, encerrou := encerrador()
+	o := opcoesDeTeste(t)
+	o.Encerrar = encerrar
+	o.EsperaSemCliente = time.Hour // só o SemJanela pode encerrar aqui
+	srv, s := servidor(t, o)
+
+	ctx, cancelar := context.WithCancel(context.Background())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/vivo?t="+testToken, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelar()
+	resp.Body.Close()
+
+	s.SemJanela()
+	select {
+	case <-encerrou:
+	case <-time.After(5 * time.Second):
+		t.Fatal("não encerrou depois de a janela fechar com a página já fechada")
 	}
 }

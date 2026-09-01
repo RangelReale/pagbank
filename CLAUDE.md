@@ -149,6 +149,14 @@ Invariantes que só aparecem lendo vários arquivos:
 
 ## Armadilhas da interface web (já resolvidas — não desfaça)
 
+- **O fim do processo do navegador NÃO prova que a janela fechou.** O Chromium sai e volta sozinho
+  ao criar o perfil, ao se recuperar de um perfil sujo e ao repassar a linha de comando para uma
+  instância existente: nesses casos o processo que lançamos morre em milissegundos e a janela é
+  aberta por outro. Encerrar o servidor no `Wait` derrubava tudo antes de a página carregar, e a
+  janela abria em cima de um "não consigo chegar a esta página" — aconteceu de verdade. Por isso o
+  `Wait` chama `Servidor.SemJanela`, que só desiste se a página tiver aberto ao menos uma vez e o
+  prazo vencer sem ninguém conectado. Pinado por `TestSemJanelaNaoEncerraAntesDaPaginaAbrir` e
+  `TestSemJanelaNaoEncerraComAPaginaAberta`.
 - **O `--user-data-dir` da janela não é conforto.** Sem ele, com o Edge já aberto, a janela de
   `--app` é adotada pelo processo existente e o `Start` volta na hora, sem nada para acompanhar — e
   o programa perde como saber que a janela fechou. Com um perfil próprio o Chromium não reaproveita

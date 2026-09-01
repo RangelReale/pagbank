@@ -36,6 +36,10 @@ const (
 	// esperaDoDesligamento é quanto o servidor dá às requisições em curso antes
 	// de cortar. Depois de cancelar o contexto base não sobra nada demorado.
 	esperaDoDesligamento = 5 * time.Second
+	// esperaSemJanelaDeApp é o ocioso do watchdog quando a interface abriu em
+	// janela própria. Curto porque ali a página é a única cliente possível, mas
+	// não instantâneo: um F5 derruba a conexão por um instante.
+	esperaSemJanelaDeApp = 8 * time.Second
 )
 
 func main() {
@@ -110,6 +114,15 @@ func run(o opcoes) error {
 	var uma sync.Once
 	encerrar := func() { uma.Do(pedirDesligamento) }
 
+	// Numa janela de aplicativo a página é a única cliente que vai existir, e o
+	// usuário não tem outras abas nossas abertas: se ela some, ele fechou a
+	// janela. A folga do watchdog pode ser bem menor que a do navegador comum,
+	// onde a aba pode estar só recarregando ou ter sido movida de janela.
+	espera := time.Duration(0)
+	if navegadorDeApp() != "" {
+		espera = esperaSemJanelaDeApp
+	}
+
 	s := web.New(web.Opcoes{
 		Dir:          pasta,
 		Token:        token,
@@ -119,6 +132,8 @@ func run(o opcoes) error {
 		ModeloCriado: criado,
 		Encerrar:     encerrar,
 		Avisar:       avisar,
+
+		EsperaSemCliente: espera,
 	})
 	defer s.Parar()
 
@@ -141,13 +156,16 @@ func run(o opcoes) error {
 		if err != nil || j == nil || j.Cmd == nil {
 			return
 		}
-		// Fechar a janela é o gesto natural de fechar um programa. O perfil
-		// próprio garante que este processo do navegador é só nosso, então
-		// esperá-lo terminar é um sinal exato — bem melhor que os trinta
-		// segundos do watchdog, que continua valendo para o degrau em que não
-		// há processo nenhum a acompanhar.
+		// Fechar a janela é o gesto natural de fechar um programa, e esperar o
+		// processo do navegador é o jeito de perceber isso na hora.
+		//
+		// Mas o fim desse processo NÃO prova que a janela fechou: o Chromium sai
+		// e volta sozinho ao criar o perfil, ao se recuperar de um perfil sujo e
+		// ao repassar a linha de comando para uma instância existente. Quem
+		// decide é o SemJanela, que só desiste se a página tiver aberto antes e
+		// não estiver aberta agora.
 		_ = j.Cmd.Wait()
-		encerrar()
+		s.SemJanela()
 	}()
 
 	erros := make(chan error, 1)

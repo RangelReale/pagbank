@@ -36,6 +36,10 @@ Ficam no ambiente ou em um arquivo `.env` no diretório de trabalho — **nunca 
 apareceria no histórico do shell e na lista de processos. Copie `.env.example` para `.env` e
 preencha o que for usar; o `.gitignore` já ignora o `.env`.
 
+A interface web lê as mesmas variáveis, no mesmo formato, de um arquivo chamado `config.env` ao
+lado do executável — um nome que aparece no Explorer, que esconde as extensões e engoliria um
+arquivo chamado só `.env`.
+
 ### Credenciais do EDI
 
 Para `pagbank-extract edi`, duas variáveis:
@@ -69,6 +73,54 @@ PAGBANK_TOKEN=<token da API, gerado no painel>
 O token é gerado no painel do vendedor, em Preferências → Integrações → Token de segurança.
 **Não é a senha da conta.**
 
+## Para quem não usa terminal
+
+Existe um segundo executável, `PagBank-Extrator.exe`, que faz o mesmo que
+`pagbank-extract transacoes` numa página no navegador — duas datas e um botão.
+É o que se entrega a quem só quer a planilha.
+
+```
+task build:web        # gera saida/PagBank-Extrator.exe
+```
+
+Na máquina de quem vai usar, basta o executável — não há nada para instalar:
+
+1. Copie o `.exe` para uma pasta sua (a Área de Trabalho ou Documentos serve).
+   Não deixe em `Arquivos de Programas` nem numa pasta de rede: ele grava as
+   planilhas ao lado de si mesmo e precisa de permissão de escrita.
+2. Dê um duplo clique. **Não abre janela de terminal**: o navegador abre sozinho
+   na página do programa.
+3. Na primeira vez a página vai dizer que faltam as credenciais e um arquivo
+   `config.env` terá aparecido na mesma pasta, em branco e comentado. Abra,
+   preencha `PAGBANK_EMAIL` e `PAGBANK_TOKEN` (o mesmo token do painel descrito
+   acima), salve e recarregue a página.
+4. Escolha as datas e clique em **Gerar planilha**. O CSV aparece na pasta do
+   executável, com a data e a hora no nome —
+   `transacoes-2026-09-01_143022.csv` —, então uma extração nunca apaga a
+   anterior nem esbarra numa planilha ainda aberta no Excel.
+5. Para fechar, clique em **Encerrar o programa**. Se você só fechar a aba, ele
+   se encerra sozinho meio minuto depois.
+
+Na primeira execução o Windows pode mostrar **"O Windows protegeu o seu PC"**:
+o executável não é assinado. Clique em *Mais informações* e depois em *Executar
+assim mesmo*.
+
+### O que a interface web não faz
+
+Só a fonte `transacoes`. Para o extrato EDI, os quatro CSVs, o `--types` e o
+resto das flags, use o `pagbank-extract` na linha de comando.
+
+### Segurança
+
+O servidor escuta só em `127.0.0.1`, nunca na rede local, e cada execução sorteia
+uma chave que precisa estar no endereço — sem ela o programa responde 403, para
+que nenhuma outra página aberta no seu navegador consiga falar com ele. Nada é
+enviado para fora: as únicas requisições que saem da máquina são as do próprio
+PagBank.
+
+O `config.env` é tão sensível quanto uma senha. Não o deixe numa pasta
+sincronizada (OneDrive, Google Drive) nem o envie por e-mail.
+
 ## Uso
 
 ```sh
@@ -93,6 +145,7 @@ Os arquivos gerados:
 |---|---|
 | `edi` | `transactional.csv`, `financial.csv`, `cashouts.csv`, `balances.csv` |
 | `transacoes` | `transacoes.csv` |
+| interface web | `transacoes-<data>_<hora>.csv`, na pasta do executável |
 
 Rode `pagbank-extract help`, ou `pagbank-extract edi -h`, para todas as flags.
 
@@ -180,6 +233,7 @@ go vet ./...
 ```
 
 Os mesmos comandos pelo Taskfile: `task test`, `task test:update` e `task vet`.
+`task build:web` compila a interface web e `task run:web` a abre na pasta atual.
 `task --list` mostra tudo o que existe.
 
 Estrutura:
@@ -187,6 +241,8 @@ Estrutura:
 | Pacote | Papel |
 |---|---|
 | `cmd/pagbank-extract` | linha de comando |
+| `cmd/pagbank-web` | a interface web local, sem janela de terminal |
+| `internal/web` | servidor em 127.0.0.1, progresso por SSE, página embutida |
 | `internal/sheet` | modelo de tabela e escrita do CSV |
 | `internal/source/edi` | cliente do Extrato EDI e achatamento do JSON |
 | `internal/source/legacy` | cliente da API legada de transações |

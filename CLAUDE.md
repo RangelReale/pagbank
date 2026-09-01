@@ -95,7 +95,7 @@ O fluxo é uma linha reta, sem estado global:
 
 ```
 cmd/pagbank-extract  → flags, credenciais, escolha da fonte, relatório final
-cmd/pagbank-web      → pasta do exe, servidor em 127.0.0.1, navegador, watchdog
+cmd/pagbank-web      → pasta do exe, servidor em 127.0.0.1, janela de app, watchdog
   internal/web       → rotas, página embutida, progresso por SSE  (só transacoes)
   internal/source    → contrato Source{Name, Fetch(ctx, Period)} → Result{Tables, Warnings}
     .../edi          → um GET por (tipo, dia, página); JSON de layout não publicado
@@ -149,6 +149,18 @@ Invariantes que só aparecem lendo vários arquivos:
 
 ## Armadilhas da interface web (já resolvidas — não desfaça)
 
+- **O `--user-data-dir` da janela não é conforto.** Sem ele, com o Edge já aberto, a janela de
+  `--app` é adotada pelo processo existente e o `Start` volta na hora, sem nada para acompanhar — e
+  o programa perde como saber que a janela fechou. Com um perfil próprio o Chromium não reaproveita
+  a instância, o processo é só nosso, e o `Wait` em `main.go` faz fechar a janela encerrar o
+  programa na hora. De quebra, isola a sessão do usuário.
+- **A busca pelo Chromium é por variável de ambiente, nunca por caminho absoluto.** O Windows pode
+  estar em outra unidade, numa instalação de 32 bits não existe `ProgramFiles(x86)`, e tanto o Edge
+  quanto o Chrome podem estar em `%LocalAppData%` (instalação por usuário). Ver `chromiums`, em
+  `cmd/pagbank-web/navegador.go`.
+- **O watchdog continua mesmo com o `Wait`.** Ele é a rede de segurança do degrau que não tem
+  processo próprio — o navegador padrão —, e do caso em que o navegador morre deixando a página
+  órfã, ou o contrário.
 - **`Shutdown` fica pendurado num fluxo SSE.** Ele espera as conexões ativas terminarem, e um SSE
   não termina sozinho. Por isso o `http.Server` tem um `BaseContext` próprio, cancelado *antes* do
   `Shutdown` (`cmd/pagbank-web/main.go`): cancelar o contexto base derruba os contextos das

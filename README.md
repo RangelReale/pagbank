@@ -88,8 +88,9 @@ Na máquina de quem vai usar, basta o executável — não há nada para instala
 1. Copie o `.exe` para uma pasta sua (a Área de Trabalho ou Documentos serve).
    Não deixe em `Arquivos de Programas` nem numa pasta de rede: ele grava as
    planilhas ao lado de si mesmo e precisa de permissão de escrita.
-2. Dê um duplo clique. **Não abre janela de terminal**: o navegador abre sozinho
-   na página do programa.
+2. Dê um duplo clique. **Não abre janela de terminal** nem aba no seu navegador:
+   o programa aparece numa janela própria, sem barra de endereço e sem abas, com
+   ícone na barra de tarefas.
 3. Na primeira vez a página vai dizer que faltam as credenciais e um arquivo
    `config.env` terá aparecido na mesma pasta, em branco e comentado. Abra,
    preencha `PAGBANK_EMAIL` e `PAGBANK_TOKEN` (o mesmo token do painel descrito
@@ -98,8 +99,16 @@ Na máquina de quem vai usar, basta o executável — não há nada para instala
    executável, com a data e a hora no nome —
    `transacoes-2026-09-01_143022.csv` —, então uma extração nunca apaga a
    anterior nem esbarra numa planilha ainda aberta no Excel.
-5. Para fechar, clique em **Encerrar o programa**. Se você só fechar a aba, ele
-   se encerra sozinho meio minuto depois.
+5. Para fechar, feche a janela no X, ou clique em **Encerrar o programa**. Nos
+   dois casos o programa sai na hora.
+
+A janela é desenhada pelo Microsoft Edge, que já vem instalado no Windows 10 e
+no 11 — não há nada a instalar. Numa máquina sem Edge, o programa tenta o Chrome
+e, na falta dos dois, abre uma aba no navegador padrão. Ele não mexe na sua
+sessão do Edge: usa um perfil separado, em
+`%LocalAppData%\PagBank-Extrator`, que não aparece no seu histórico nem entre as
+suas abas. Essa pasta pode ser apagada a qualquer momento; ela nasce de novo na
+execução seguinte.
 
 Na primeira execução o Windows pode mostrar **"O Windows protegeu o seu PC"**:
 o executável não é assinado. Clique em *Mais informações* e depois em *Executar

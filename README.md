@@ -9,6 +9,9 @@ Escrito em Go, só com a biblioteca padrão — não há dependências para inst
 go build ./cmd/pagbank-extract
 ```
 
+Com o [Task](https://taskfile.dev) instalado, `task build` faz o mesmo e grava o
+executável em `saida/`.
+
 ## Qual fonte usar
 
 O PagBank não tem uma API única de "extrato da conta". Existem duas fontes viáveis, com
@@ -175,6 +178,9 @@ go test ./...                      # tudo offline: httptest e fixtures, nenhum t
 go test ./... -update              # regrava os CSVs golden em testdata
 go vet ./...
 ```
+
+Os mesmos comandos pelo Taskfile: `task test`, `task test:update` e `task vet`.
+`task --list` mostra tudo o que existe.
 
 Estrutura:
 

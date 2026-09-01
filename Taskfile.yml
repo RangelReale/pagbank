@@ -1,0 +1,60 @@
+# https://taskfile.dev
+version: '3'
+
+vars:
+  BIN: pagbank-extract
+  SAIDA: saida
+  EXE: '{{if eq OS "windows"}}.exe{{end}}'
+  ALVO: '{{.SAIDA}}/{{.BIN}}{{.EXE}}'
+
+tasks:
+  default:
+    desc: Compila o executável
+    cmds:
+      - task: build
+
+  build:
+    desc: Compila o executável em saida/
+    cmds:
+      # saida/ é ignorada pelo git, então num clone novo ela não existe — e o
+      # interpretador do Task não tem mkdir embutido.
+      - cmd: powershell -NoProfile -Command "New-Item -ItemType Directory -Force -Path '{{.SAIDA}}' | Out-Null"
+        platforms: [windows]
+      - cmd: mkdir -p {{.SAIDA}}
+        platforms: [linux, darwin]
+      # sem -buildvcs=false: o `version` imprime o hash que o Go carimba no binário.
+      - go build -o {{.ALVO}} ./cmd/pagbank-extract
+    sources:
+      - '**/*.go'
+      - go.mod
+    generates:
+      - '{{.ALVO}}'
+
+  run:
+    desc: 'Compila e executa: task run -- transacoes --from 2026-08-01'
+    deps: [build]
+    cmds:
+      - '{{.ALVO}} {{.CLI_ARGS}}'
+
+  test:
+    desc: Roda os testes (tudo offline)
+    cmds:
+      - go test ./...
+
+  test:update:
+    desc: Regrava os CSVs golden em testdata
+    cmds:
+      - go test ./... -update
+
+  vet:
+    desc: Roda o go vet
+    cmds:
+      - go vet ./...
+
+  clean:
+    desc: Remove o executável de saida/ (não mexe nos CSVs)
+    cmds:
+      - cmd: powershell -NoProfile -Command "Remove-Item -Force -ErrorAction SilentlyContinue '{{.ALVO}}'"
+        platforms: [windows]
+      - cmd: rm -f {{.ALVO}}
+        platforms: [linux, darwin]

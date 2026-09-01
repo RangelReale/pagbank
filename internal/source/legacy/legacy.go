@@ -64,6 +64,14 @@ type Client struct {
 	SemDetalhes bool
 	// Logf, quando definido, reporta o progresso (janela e página).
 	Logf func(format string, args ...any)
+	// ProgressoDetalhe, quando definido, informa o avanço da segunda passada.
+	//
+	// É a única etapa com um total conhecido de antemão — a busca por data só
+	// descobre quantas páginas existem ao receber a primeira resposta —, e é a
+	// que demora. A interface web precisa desse par de números para desenhar
+	// uma barra; extraí-lo do texto do Logf acoplaria a barra à redação de uma
+	// mensagem de log, que ninguém lembraria de manter.
+	ProgressoDetalhe func(feitos, total int)
 	// Now existe para o teste fixar "hoje" ao validar o limite de histórico.
 	Now func() time.Time
 }
@@ -89,6 +97,12 @@ func (c *Client) Name() string { return "transações (API legada)" }
 func (c *Client) logf(format string, args ...any) {
 	if c.Logf != nil {
 		c.Logf(format, args...)
+	}
+}
+
+func (c *Client) progressoDetalhe(feitos, total int) {
+	if c.ProgressoDetalhe != nil {
+		c.ProgressoDetalhe(feitos, total)
 	}
 }
 
@@ -183,6 +197,7 @@ func (c *Client) detalhar(ctx context.Context, txs []transaction, res *source.Re
 			continue
 		}
 		c.logf("detalhe %d/%d: %s", i+1, len(txs), txs[i].Code)
+		c.progressoDetalhe(i+1, len(txs))
 		d, err := c.fetchDetail(ctx, txs[i].Code)
 		if err != nil {
 			if ctx.Err() != nil {

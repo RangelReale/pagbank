@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="pt-BR">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Extrair vendas do PagBank</title>
+<style>
+  :root {
+    --tinta: #16191d; --fraco: #5c6672; --linha: #dfe3e8; --fundo: #f4f6f8;
+    --papel: #fff; --acao: #0b6b3a; --acao-forte: #085229;
+    --aviso-fundo: #fff8e1; --aviso-linha: #e6c200; --aviso-tinta: #6b5200;
+    --erro-fundo: #fdeceb; --erro-linha: #d94a3d; --erro-tinta: #8f2118;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2.5rem 1rem 4rem; background: var(--fundo); color: var(--tinta);
+    font: 16px/1.6 system-ui, "Segoe UI", sans-serif;
+  }
+  main { max-width: 42rem; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; }
+  h2 { font-size: 1.1rem; margin: 0 0 .75rem; }
+  p { margin: 0 0 1rem; }
+  .sub { color: var(--fraco); margin-bottom: 2rem; }
+  .cartao {
+    background: var(--papel); border: 1px solid var(--linha); border-radius: 10px;
+    padding: 1.5rem; margin-bottom: 1.25rem;
+  }
+  .caminho {
+    font: 13px/1.5 ui-monospace, Consolas, monospace; background: var(--fundo);
+    border: 1px solid var(--linha); border-radius: 6px; padding: .5rem .7rem;
+    word-break: break-all; user-select: all;
+  }
+  label { display: block; font-weight: 600; margin-bottom: .3rem; }
+  .datas { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .datas > div { flex: 1 1 12rem; }
+  input[type=date] {
+    width: 100%; padding: .55rem .6rem; font: inherit; color: inherit;
+    border: 1px solid var(--linha); border-radius: 6px; background: var(--papel);
+  }
+  fieldset { border: 0; margin: 0 0 1.25rem; padding: 0; }
+  legend { font-weight: 600; padding: 0; margin-bottom: .5rem; }
+  .escolha { display: flex; gap: .6rem; align-items: flex-start; margin-bottom: .6rem; }
+  .escolha input { margin-top: .45rem; }
+  .escolha span { display: block; color: var(--fraco); font-size: .9rem; }
+  button {
+    font: inherit; font-weight: 600; padding: .65rem 1.4rem; border-radius: 6px;
+    border: 1px solid transparent; background: var(--acao); color: #fff; cursor: pointer;
+  }
+  button:hover { background: var(--acao-forte); }
+  button[disabled] { opacity: .5; cursor: default; }
+  button.discreto { background: transparent; color: var(--fraco); border-color: var(--linha); }
+  button.discreto:hover { background: var(--fundo); color: var(--tinta); }
+  .acoes { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; }
+  progress { width: 100%; height: .6rem; margin: .75rem 0; }
+  pre {
+    margin: .5rem 0 0; max-height: 12rem; overflow: auto; background: var(--fundo);
+    border: 1px solid var(--linha); border-radius: 6px; padding: .6rem .7rem;
+    font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap;
+  }
+  ul { margin: 0; padding-left: 1.2rem; }
+  li { margin-bottom: .35rem; }
+  .aviso { background: var(--aviso-fundo); border-color: var(--aviso-linha); color: var(--aviso-tinta); }
+  .erro { background: var(--erro-fundo); border-color: var(--erro-linha); color: var(--erro-tinta); }
+  .neutro { color: var(--fraco); }
+  footer { color: var(--fraco); font-size: .85rem; text-align: center; margin-top: 2rem; }
+  [hidden] { display: none !important; }
+</style>
+
+<main>
+  <h1>Extrair vendas do PagBank</h1>
+  <p class="sub">As planilhas são gravadas nesta pasta:<br>
+    <span class="caminho">{{.Pasta}}</span></p>
+
+  {{if .ErroPasta}}
+  <section class="cartao erro">
+    <h2>Esta pasta não aceita gravação</h2>
+    <p>{{.ErroPasta}}</p>
+    <p>Feche o programa, copie o executável para uma pasta sua — a Área de
+      Trabalho ou Documentos — e abra de novo a partir de lá.</p>
+  </section>
+  {{end}}
+
+  {{if .Configurar}}
+  <section class="cartao">
+    <h2>Falta configurar as credenciais</h2>
+    <p>O programa precisa do seu e-mail e do token da API do PagBank para
+      consultar as vendas da conta.</p>
+
+    {{if .ModeloCriado}}
+    <p><strong>Criei o arquivo abaixo, em branco, com as instruções dentro.</strong>
+      Abra, preencha as duas últimas linhas, salve e recarregue esta página.</p>
+    {{else}}
+    <p>Abra o arquivo abaixo e preencha
+      {{if .Faltando}}{{range $i, $v := .Faltando}}{{if $i}} e {{end}}<code>{{$v}}</code>{{end}}{{else}}as duas linhas do fim{{end}}.
+      Depois salve e recarregue esta página.</p>
+    {{end}}
+
+    <p class="caminho">{{.Config}}</p>
+
+    {{if .AmbienteVence}}
+    <p class="neutro">Atenção: existe uma variável de ambiente
+      <code>PAGBANK_TOKEN</code> nesta máquina, e ela tem prioridade sobre o
+      arquivo. Se preencher o arquivo não resolver, é isso.</p>
+    {{end}}
+
+    <h2 style="margin-top:1.5rem">Onde conseguir o token</h2>
+    <ul>{{range .ComoObter}}<li>{{.}}</li>{{end}}</ul>
+
+    <details style="margin-top:1rem">
+      <summary>Não consigo abrir o arquivo — mostre o conteúdo para eu criar à mão</summary>
+      <pre id="modelo">{{range .Modelo}}{{.}}
+{{end}}</pre>
+    </details>
+
+    <p style="margin-top:1.5rem"><button onclick="location.reload()">Já preenchi, recarregar</button></p>
+  </section>
+  {{else}}
+
+  <form class="cartao" id="form">
+    <div class="datas">
+      <div>
+        <label for="de">De</label>
+        <input type="date" id="de" value="{{.De}}" min="{{.Min}}" max="{{.Max}}" required>
+      </div>
+      <div>
+        <label for="ate">Até</label>
+        <input type="date" id="ate" value="{{.Ate}}" min="{{.Min}}" max="{{.Max}}" required>
+      </div>
+    </div>
+    <p class="neutro" style="margin-top:-.75rem;font-size:.9rem">
+      A API do PagBank guarda só os últimos 6 meses de vendas.</p>
+
+    <fieldset>
+      <legend>O que trazer</legend>
+      <label class="escolha">
+        <input type="radio" name="modo" value="completa" checked>
+        <span style="color:var(--tinta);font-weight:600">Completa (recomendada)
+          <span>Busca o detalhe de cada venda. Traz parcelas, itens, última
+            atualização e o meio de pagamento detalhado — mas leva alguns minutos
+            num mês de muitas vendas.</span></span>
+      </label>
+      <label class="escolha">
+        <input type="radio" name="modo" value="rapida">
+        <span style="color:var(--tinta);font-weight:600">Rápida
+          <span>Termina em segundos, mas quatro colunas saem em branco: última
+            atualização, meio de pagamento (detalhe), parcelas e itens.</span></span>
+      </label>
+    </fieldset>
+
+    <div class="acoes"><button type="submit" id="gerar">Gerar planilha</button></div>
+  </form>
+
+  <section class="cartao" id="andamento" hidden>
+    <h2 id="fase">Buscando as vendas…</h2>
+    <progress id="barra"></progress>
+    <div class="acoes">
+      <button type="button" class="discreto" id="cancelar">Cancelar</button>
+      <span class="neutro" id="relogio"></span>
+    </div>
+    <details style="margin-top:1rem">
+      <summary class="neutro">Ver o que está acontecendo</summary>
+      <pre id="log"></pre>
+    </details>
+  </section>
+
+  <section class="cartao" id="pronto" hidden>
+    <h2 id="prontoTitulo">Pronto</h2>
+    <p id="prontoResumo"></p>
+    <p class="caminho" id="prontoArquivo"></p>
+    <div class="acoes"><button type="button" id="outro">Extrair outro período</button></div>
+  </section>
+
+  <section class="cartao aviso" id="avisos" hidden>
+    <h2>A extração terminou, mas com ressalvas</h2>
+    <ul id="listaAvisos"></ul>
+  </section>
+
+  <section class="cartao erro" id="erro" hidden>
+    <h2 id="erroTitulo">Não deu certo</h2>
+    <p id="erroTexto"></p>
+    <p id="erroDica">Confira o e-mail e o token no arquivo <code>config.env</code>, nesta mesma pasta.</p>
+    <div class="acoes"><button type="button" class="discreto" id="voltar">Voltar</button></div>
+  </section>
+  {{end}}
+
+  <footer>
+    <button type="button" class="discreto" id="encerrar">Encerrar o programa</button>
+    <p>pagbank-extract {{.Versao}}</p>
+  </footer>
+</main>
+
+<noscript>
+  <p style="max-width:42rem;margin:1rem auto;padding:1rem;background:#fdeceb">
+    Esta página precisa de JavaScript para mostrar o progresso da extração.</p>
+</noscript>
+
+<script>
+(function () {
+  "use strict";
+  var TOKEN = {{.Token}};
+  var q = function (id) { return document.getElementById(id); };
+
+  // O batimento é como o programa sabe que a página ainda está aberta: sem
+  // nenhuma aba viva por um tempo, ele se encerra sozinho em vez de ficar
+  // rodando invisível — não há janela de terminal para o usuário fechar.
+  new EventSource("/vivo?t=" + encodeURIComponent(TOKEN));
+
+  q("encerrar").addEventListener("click", function () {
+    document.body.textContent = "Programa encerrado. Pode fechar esta aba.";
+    fetch("/sair?t=" + encodeURIComponent(TOKEN), { method: "POST" }).catch(function () {});
+  });
+
+  var form = q("form");
+  if (!form) { return; }
+
+  var fluxo = null, inicio = 0, cronometro = 0, linhas = [];
+
+  function mostrar(id, sim) { q(id).hidden = !sim; }
+
+  function tela(nome) {
+    form.hidden = nome !== "form";
+    mostrar("andamento", nome === "andamento");
+    mostrar("pronto", nome === "pronto");
+    if (nome !== "pronto") { mostrar("avisos", false); }
+    if (nome !== "erro") { mostrar("erro", false); }
+    mostrar("erro", nome === "erro");
+  }
+
+  function tique() {
+    var s = Math.floor((Date.now() - inicio) / 1000);
+    var m = Math.floor(s / 60);
+    q("relogio").textContent = m > 0 ? m + " min " + (s % 60) + " s" : s + " s";
+  }
+
+  function encerrarFluxo() {
+    if (fluxo) { fluxo.close(); fluxo = null; }
+    clearInterval(cronometro);
+  }
+
+  // Sempre textContent, nunca innerHTML: as linhas vêm da API do PagBank e não
+  // podem virar marcação nesta página.
+  function anotar(texto) {
+    linhas.push(texto);
+    if (linhas.length > 200) { linhas.shift(); }
+    var pre = q("log");
+    pre.textContent = linhas.join("\n");
+    pre.scrollTop = pre.scrollHeight;
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var de = q("de").value, ate = q("ate").value;
+    if (!de || !ate) { return; }
+    if (ate < de) { falhar("outro", "A data final é anterior à data inicial."); return; }
+
+    linhas = [];
+    q("log").textContent = "";
+    q("fase").textContent = "Buscando as vendas…";
+    q("barra").removeAttribute("value");
+    q("gerar").disabled = true;
+    tela("andamento");
+
+    inicio = Date.now();
+    tique();
+    cronometro = setInterval(tique, 1000);
+
+    var detalhes = document.querySelector("input[name=modo]:checked").value === "completa" ? "1" : "0";
+    fluxo = new EventSource("/extrair?t=" + encodeURIComponent(TOKEN) +
+      "&de=" + de + "&ate=" + ate + "&detalhes=" + detalhes);
+
+    fluxo.addEventListener("progresso", function (e) {
+      var d = JSON.parse(e.data);
+      if (d.total > 0) {
+        q("fase").textContent = "Buscando o detalhe de cada venda (" +
+          d.feitos.toLocaleString("pt-BR") + " de " + d.total.toLocaleString("pt-BR") + ")";
+        q("barra").max = d.total;
+        q("barra").value = d.feitos;
+      }
+      if (d.texto) { anotar(d.texto); }
+    });
+
+    fluxo.addEventListener("fim", function (e) { concluir(JSON.parse(e.data)); });
+    fluxo.addEventListener("erro", function (e) {
+      var d = JSON.parse(e.data);
+      falhar(d.tipo, d.mensagem);
+    });
+    // O EventSource reconecta sozinho quando o fluxo cai. Sem fechá-lo aqui, uma
+    // queda de conexão dispararia uma extração nova a cada tentativa.
+    fluxo.onerror = function () {
+      if (fluxo && fluxo.readyState === EventSource.CLOSED) {
+        falhar("outro", "A conexão com o programa caiu antes de a extração terminar.");
+      }
+    };
+  });
+
+  function concluir(d) {
+    encerrarFluxo();
+    q("gerar").disabled = false;
+
+    if (d.vazio) {
+      q("prontoTitulo").textContent = "Nenhuma venda no período";
+      q("prontoResumo").textContent =
+        "A planilha foi criada mesmo assim, só com o cabeçalho. Levou " + d.duracao + ".";
+    } else {
+      q("prontoTitulo").textContent = "Pronto";
+      q("prontoResumo").textContent = d.linhas.toLocaleString("pt-BR") +
+        " venda(s) gravada(s) em " + d.duracao + ".";
+    }
+    q("prontoArquivo").textContent = d.arquivos.map(function (a) { return a.caminho; }).join("\n");
+    tela("pronto");
+
+    var lista = q("listaAvisos");
+    lista.textContent = "";
+    (d.avisos || []).forEach(function (a) {
+      var li = document.createElement("li");
+      li.textContent = a;
+      lista.appendChild(li);
+    });
+    mostrar("avisos", (d.avisos || []).length > 0);
+  }
+
+  function falhar(tipo, mensagem) {
+    encerrarFluxo();
+    q("gerar").disabled = false;
+    if (tipo === "cancelado") {
+      q("erroTitulo").textContent = "Extração cancelada";
+      q("erroTexto").textContent = "Nenhuma planilha foi gravada.";
+      q("erroDica").hidden = true;
+    } else {
+      q("erroTitulo").textContent = "Não deu certo";
+      q("erroTexto").textContent = mensagem;
+      q("erroDica").hidden = false;
+    }
+    tela("erro");
+  }
+
+  q("cancelar").addEventListener("click", function () { falhar("cancelado", ""); });
+  q("voltar").addEventListener("click", function () { tela("form"); });
+  q("outro").addEventListener("click", function () { tela("form"); });
+
+  // Fechar a aba cancela a extração, e minutos de trabalho iriam junto.
+  window.addEventListener("beforeunload", function (ev) {
+    if (fluxo) { ev.preventDefault(); ev.returnValue = ""; }
+  });
+})();
+</script>
+</html>

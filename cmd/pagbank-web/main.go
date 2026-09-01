@@ -21,10 +21,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"runtime/debug"
 	"sync"
 	"time"
@@ -46,7 +44,7 @@ func main() {
 
 	err := run(opcoes{
 		dir:   *dir,
-		abrir: abrirNavegador,
+		abrir: abrirJanela,
 		// Com -H=windowsgui o stdout não vai a lugar nenhum, mas quem rodar o
 		// programa com a saída redirecionada — o suporte, um script — recebe o
 		// endereço mesmo assim.
@@ -63,7 +61,7 @@ func main() {
 // testes.
 type opcoes struct {
 	dir    string
-	abrir  func(url string) error
+	abrir  func(url, perfil string) (*janela, error)
 	pronto func(url string)
 }
 
@@ -136,9 +134,21 @@ func run(o opcoes) error {
 	if o.pronto != nil {
 		o.pronto(endereco)
 	}
-	// Falhar aqui não é fatal: passados vinte segundos sem ninguém abrir a
-	// página, o próprio servidor mostra o endereço numa caixa de mensagem.
-	go func() { _ = o.abrir(endereco) }()
+	go func() {
+		// Falhar aqui não é fatal: passados vinte segundos sem ninguém abrir a
+		// página, o próprio servidor mostra o endereço numa caixa de mensagem.
+		j, err := o.abrir(endereco, perfilDaJanela())
+		if err != nil || j == nil || j.Cmd == nil {
+			return
+		}
+		// Fechar a janela é o gesto natural de fechar um programa. O perfil
+		// próprio garante que este processo do navegador é só nosso, então
+		// esperá-lo terminar é um sinal exato — bem melhor que os trinta
+		// segundos do watchdog, que continua valendo para o degrau em que não
+		// há processo nenhum a acompanhar.
+		_ = j.Cmd.Wait()
+		encerrar()
+	}()
 
 	erros := make(chan error, 1)
 	go func() { erros <- srv.Serve(ln) }()
@@ -184,26 +194,6 @@ func pastaDeTrabalho(override string) (string, error) {
 		exe = resolvido
 	}
 	return filepath.Dir(exe), nil
-}
-
-// abrirNavegador pede ao sistema que abra a URL no navegador padrão.
-//
-// No Windows é rundll32, e não `cmd /c start`: o start trata o primeiro
-// argumento entre aspas como título da janela, quebra no & da query string e
-// ainda pisca um console — que é justamente o que este binário existe para
-// evitar.
-func abrirNavegador(endereco string) error {
-	var c *exec.Cmd
-	switch runtime.GOOS {
-	case "windows":
-		c = exec.Command("rundll32", "url.dll,FileProtocolHandler", endereco)
-	case "darwin":
-		c = exec.Command("open", endereco)
-	default:
-		c = exec.Command("xdg-open", endereco)
-	}
-	esconderJanela(c)
-	return c.Start()
 }
 
 func versionString() string {

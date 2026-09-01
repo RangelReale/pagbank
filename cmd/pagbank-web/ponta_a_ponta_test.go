@@ -57,8 +57,9 @@ func TestProgramaGeraOCSVPontaAPonta(t *testing.T) {
 	parou := make(chan error, 1)
 	go func() {
 		parou <- run(opcoes{
-			dir:    dir,
-			abrir:  func(string) error { return nil },
+			dir: dir,
+			// Sem janela nenhuma: o teste é o cliente HTTP daqui de baixo.
+			abrir:  func(string, string) (*janela, error) { return &janela{}, nil },
 			pronto: func(u string) { enderecos <- u },
 		})
 	}()

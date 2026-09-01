@@ -205,8 +205,11 @@
   new EventSource("/vivo?t=" + encodeURIComponent(TOKEN));
 
   q("encerrar").addEventListener("click", function () {
-    document.body.textContent = "Programa encerrado. Pode fechar esta aba.";
+    document.body.textContent = "Programa encerrado. Pode fechar esta janela.";
     fetch("/sair?t=" + encodeURIComponent(TOKEN), { method: "POST" }).catch(function () {});
+    // Em modo aplicativo isto fecha a janela de verdade. Numa aba comum o
+    // navegador ignora, e aí vale o texto acima.
+    window.close();
   });
 
   var form = q("form");

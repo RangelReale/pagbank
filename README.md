@@ -129,6 +129,9 @@ Em ambos os casos **a coluna com o valor cru é a autoritativa**: nada é descar
   API responde para data anterior à ativação do EDI.
 - `transações repetidas descartadas` — a paginação da API legada corre sobre dados vivos, e a
   mesma transação pode reaparecer em outra página. A deduplicação é pelo código da transação.
+- `o período termina no futuro` — a API legada não responde por datas futuras, e o resto do dia
+  de hoje é futuro: a consulta é cortada no instante atual. Rodar de novo mais tarde traz as
+  vendas que faltavam.
 
 ## Desenvolvimento
 

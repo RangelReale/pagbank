@@ -39,7 +39,17 @@ const (
 
 	// TableName é o nome da tabela — e do arquivo — produzida por esta fonte.
 	TableName = "transacoes"
+
+	// clockSkew é a folga descontada de "agora" ao cortar o finalDate. O relógio
+	// desta máquina pode estar alguns segundos à frente do relógio do PagBank, e
+	// nesse caso a consulta inteira falharia por uma data "no futuro".
+	clockSkew = time.Minute
 )
+
+// brasilia é o fuso em que a API interpreta as datas que recebe — ela não aceita
+// deslocamento na query. O Brasil não tem mais horário de verão desde 2019,
+// então o deslocamento é fixo e não depende de tzdata.
+var brasilia = time.FixedZone("-03:00", -3*60*60)
 
 // Client consulta as transações da conta.
 type Client struct {
@@ -82,6 +92,10 @@ func (c *Client) logf(format string, args ...any) {
 func (c *Client) Fetch(ctx context.Context, p source.Period) (*source.Result, error) {
 	res := &source.Result{}
 	if err := c.checkHistory(p, res); err != nil {
+		return nil, err
+	}
+	p, err := c.checkFuture(p, res)
+	if err != nil {
 		return nil, err
 	}
 
@@ -136,6 +150,30 @@ func (c *Client) checkHistory(p source.Period, res *source.Result) error {
 	return nil
 }
 
+// checkFuture corta o período em hoje. A API recusa qualquer consulta que
+// termine no futuro ("finalDate must be lower than allowed limit", código
+// 13009), e como --to vale hoje por padrão, o caso comum cairia nessa recusa.
+func (c *Client) checkFuture(p source.Period, res *source.Result) (source.Period, error) {
+	hoje := c.hoje()
+	if p.From.After(hoje) {
+		return p, fmt.Errorf("o período começa em %s, no futuro: a API só responde até hoje (%s)",
+			p.From.Format(source.DateLayout), hoje.Format(source.DateLayout))
+	}
+	if p.To.After(hoje) {
+		res.Warnf("o período termina em %s, no futuro: a consulta foi cortada em hoje (%s)",
+			p.To.Format(source.DateLayout), hoje.Format(source.DateLayout))
+		p.To = hoje
+	}
+	return p, nil
+}
+
+// hoje é o dia corrente no fuso da API, na mesma forma que source.Period usa
+// para as pontas do período: meia-noite UTC.
+func (c *Client) hoje() time.Time {
+	n := c.now().In(brasilia)
+	return time.Date(n.Year(), n.Month(), n.Day(), 0, 0, 0, 0, time.UTC)
+}
+
 func (c *Client) now() time.Time {
 	if c.Now != nil {
 		return c.Now()
@@ -149,7 +187,7 @@ func (c *Client) fetchPage(ctx context.Context, w source.Period, page int) (*sea
 	q.Set("token", c.Token)
 	// O intervalo é fechado nas duas pontas; o fim do último dia é 23:59:59.
 	q.Set("initialDate", w.From.Format("2006-01-02T15:04:05"))
-	q.Set("finalDate", w.To.Add(24*time.Hour-time.Second).Format("2006-01-02T15:04:05"))
+	q.Set("finalDate", c.finalDate(w))
 	q.Set("page", fmt.Sprint(page))
 	q.Set("maxPageResults", fmt.Sprint(maxPageResults))
 
@@ -167,6 +205,16 @@ func (c *Client) fetchPage(ctx context.Context, w source.Period, page int) (*sea
 		return nil, fmt.Errorf("resposta XML inesperada: %w", err)
 	}
 	return &r, nil
+}
+
+// finalDate é o fim da janela no formato da API. O fim do dia de hoje ainda é
+// futuro, e a API recusa isso (código 13009), então o valor é cortado em agora.
+func (c *Client) finalDate(w source.Period) string {
+	fim := time.Date(w.To.Year(), w.To.Month(), w.To.Day(), 23, 59, 59, 0, brasilia)
+	if agora := c.now().In(brasilia).Add(-clockSkew); fim.After(agora) {
+		fim = agora
+	}
+	return fim.Format("2006-01-02T15:04:05")
 }
 
 // explain traduz os erros HTTP mais comuns desta API para algo acionável.

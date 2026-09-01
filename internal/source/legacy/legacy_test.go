@@ -277,6 +277,62 @@ func TestFetchAvisaPeriodoParcialmenteForaDoHistorico(t *testing.T) {
 	}
 }
 
+func TestFetchCortaOFinalDateEmAgora(t *testing.T) {
+	c, pedidos := servidor(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write(fixture(t, "vazia.xml"))
+	})
+
+	// "Hoje" no teste é 31/08/2026 00:00 UTC, ou seja, 30/08 às 21:00 em
+	// Brasília. O fim do dia 30 ainda é futuro para a API, que recusaria a
+	// consulta (código 13009): o valor tem que ser cortado em agora, menos a
+	// folga de relógio.
+	if _, err := c.Fetch(context.Background(), periodo(t, "2026-08-30", "2026-08-30")); err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	q := (*pedidos)[0]
+	if got, want := q.Get("finalDate"), "2026-08-30T20:59:00"; got != want {
+		t.Errorf("finalDate = %q, quero %q", got, want)
+	}
+	if got, want := q.Get("initialDate"), "2026-08-30T00:00:00"; got != want {
+		t.Errorf("initialDate = %q, quero %q", got, want)
+	}
+}
+
+func TestFetchAvisaPeriodoQueTerminaNoFuturo(t *testing.T) {
+	c, pedidos := servidor(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write(fixture(t, "vazia.xml"))
+	})
+
+	res, err := c.Fetch(context.Background(), periodo(t, "2026-08-28", "2026-09-10"))
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	if len(res.Warnings) == 0 || !strings.Contains(res.Warnings[0], "no futuro") {
+		t.Fatalf("avisos = %v", res.Warnings)
+	}
+	// Uma janela só, e nenhuma consulta além de hoje.
+	if len(*pedidos) != 1 {
+		t.Fatalf("requisições = %d, quero 1", len(*pedidos))
+	}
+	if got, want := (*pedidos)[0].Get("finalDate"), "2026-08-30T20:59:00"; got != want {
+		t.Errorf("finalDate = %q, quero %q", got, want)
+	}
+}
+
+func TestFetchRecusaPeriodoQueComecaNoFuturo(t *testing.T) {
+	c, pedidos := servidor(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Write(fixture(t, "vazia.xml"))
+	})
+
+	_, err := c.Fetch(context.Background(), periodo(t, "2026-09-05", "2026-09-10"))
+	if err == nil || !strings.Contains(err.Error(), "no futuro") {
+		t.Fatalf("erro = %v", err)
+	}
+	if len(*pedidos) != 0 {
+		t.Errorf("não deveria ter feito requisição alguma")
+	}
+}
+
 func TestFetchExplicaErroDaAPI(t *testing.T) {
 	c, _ := servidor(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)

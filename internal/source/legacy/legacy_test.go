@@ -214,8 +214,7 @@ func TestFetchTraduzCodigosEPreservaOsCrus(t *testing.T) {
 		{"Status (código)", "3"},
 		{"Meio de pagamento", "Cartão de crédito"},
 		{"Meio de pagamento (código)", "1"},
-		// tipo não tem tabela confiável: cai no código, nunca em célula vazia.
-		{"Tipo", "código 1"},
+		{"Tipo", "Pagamento"},
 		{"Tipo (código)", "1"},
 	}
 	for _, cs := range casos {
@@ -223,9 +222,13 @@ func TestFetchTraduzCodigosEPreservaOsCrus(t *testing.T) {
 			t.Errorf("%s = %q, quero %q", cs.coluna, got, cs.want)
 		}
 	}
-	// Código desconhecido também vira "código N".
 	if got := tab.Rows[1][colIndex(t, tab, "Status")]; got != "Retenção temporária" {
 		t.Errorf("status 9 = %q", got)
+	}
+	// Tipo fora da tabela vira "código N", nunca célula vazia: a tabela de
+	// tipos só tem o que foi confirmado numa conta real.
+	if got := tab.Rows[1][colIndex(t, tab, "Tipo")]; got != "código 11" {
+		t.Errorf("tipo 11 = %q, quero o código cru", got)
 	}
 }
 

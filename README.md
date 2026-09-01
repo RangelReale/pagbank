@@ -114,9 +114,13 @@ tudo.
 **2. Tabela de `<type>` das transações.** No comando `transacoes`, os códigos de `status` e de
 meio de pagamento ganham uma coluna de descrição ao lado da coluna com o código cru. Já a
 tabela do campo `type` não consta mais da documentação pública e as listas que circulam em SDKs
-de terceiros divergem entre si, então esse campo aparece como `código N` em vez de arriscar
-rotular a linha errada. Confirmados os valores numa conta real, preencha o mapa `tipos` em
-[`internal/source/legacy/codigos.go`](internal/source/legacy/codigos.go) — é a única mudança
+de terceiros divergem entre si, então só entra no mapa `tipos` de
+[`internal/source/legacy/codigos.go`](internal/source/legacy/codigos.go) o que for confirmado
+numa conta real; o resto aparece como `código N`, em vez de arriscar rotular a linha errada.
+
+Da primeira extração real saiu o código `1` (vendas comuns, em crédito, débito e PIX) e, na
+tabela de meios de pagamento, os códigos `8` (cartão de débito) e `11` (PIX), que também não
+constam da documentação. Ao confirmar outros, acrescente-os no mapa — é a única mudança
 necessária.
 
 Em ambos os casos **a coluna com o valor cru é a autoritativa**: nada é descartado.

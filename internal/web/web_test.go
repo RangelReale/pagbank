@@ -712,3 +712,31 @@ func TestSemJanelaEncerraDepoisQueAPaginaFechou(t *testing.T) {
 		t.Fatal("não encerrou depois de a janela fechar com a página já fechada")
 	}
 }
+
+func TestWatchdogVoltaDepoisDeAdiarPorExtracao(t *testing.T) {
+	// Sem janela e sem página, mas com uma extração ainda se desfazendo, o
+	// watchdog adia — e precisa voltar. Sem o reagendamento o processo ficaria
+	// órfão para sempre: invisível, sem janela e segurando a porta.
+	encerrar, encerrou := encerrador()
+	o := opcoesDeTeste(t)
+	o.Encerrar = encerrar
+	o.EsperaSemJanela = 10 * time.Millisecond
+	s := New(o)
+	defer s.Parar()
+
+	s.extraindo.Store(true)
+	s.talvezEncerrar()
+
+	select {
+	case <-encerrou:
+		t.Fatal("encerrou com uma extração em curso")
+	case <-time.After(20 * o.EsperaSemJanela):
+	}
+
+	s.extraindo.Store(false)
+	select {
+	case <-encerrou:
+	case <-time.After(5 * time.Second):
+		t.Fatal("o watchdog não voltou depois que a extração terminou: processo órfão")
+	}
+}

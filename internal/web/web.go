@@ -257,19 +257,36 @@ func (s *Servidor) saiuCliente() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.clientes--
-	if s.clientes <= 0 && s.ocioso == nil {
+	if s.clientes <= 0 {
+		if s.ocioso != nil {
+			s.ocioso.Stop()
+		}
 		s.ocioso = time.AfterFunc(s.o.EsperaSemCliente, s.talvezEncerrar)
 	}
 }
 
 // talvezEncerrar desliga o programa se ninguém voltou e nada está rodando.
+//
+// Uma extração em curso adia a decisão em vez de cancelá-la, e o novo prazo é
+// obrigatório: sem ele, quem fechasse a janela no meio de uma extração que
+// demorasse a se desfazer deixaria o processo órfão para sempre — sem janela,
+// invisível, segurando a porta. É justamente o que o watchdog existe para
+// evitar.
 func (s *Servidor) talvezEncerrar() {
 	s.mu.Lock()
 	vazio := s.clientes <= 0
 	s.mu.Unlock()
-	if vazio && !s.extraindo.Load() {
-		s.o.Encerrar()
+	if !vazio {
+		// A página voltou. Quem sair de novo arma o próximo prazo.
+		return
 	}
+	if s.extraindo.Load() {
+		s.mu.Lock()
+		s.ocioso = time.AfterFunc(s.o.EsperaSemJanela, s.talvezEncerrar)
+		s.mu.Unlock()
+		return
+	}
+	s.o.Encerrar()
 }
 
 // SemJanela avisa que o processo do navegador que abrimos terminou.
@@ -352,10 +369,14 @@ func (s *Servidor) extrair(w http.ResponseWriter, r *http.Request) {
 			Mensagem: "já existe uma extração em andamento; espere ela terminar antes de pedir outra"})
 		return
 	}
-	defer s.extraindo.Store(false)
-
+	// A ordem importa, e é o contrário da que se escreve sem pensar: defer é
+	// LIFO, então a marca de "extraindo" tem de ser registrada por último para
+	// cair primeiro. Ao contrário, saiuCliente armaria o prazo do watchdog com
+	// extraindo ainda true, ele venceria numa extração instantânea e o
+	// talvezEncerrar adiaria a decisão sem motivo.
 	s.entrouCliente()
 	defer s.saiuCliente()
+	defer s.extraindo.Store(false)
 
 	err := s.rodar(r.Context(), f, pedidoDaQuery(r))
 	switch {

@@ -72,6 +72,7 @@ func TestFetchDetalhesPreencheOQueOResumoNaoTraz(t *testing.T) {
 		{"Última atualização", "2026-08-31T16:04:12-03:00"},
 		{"Meio de pagamento (detalhe)", "101"},
 		{"Referência", "MAQUININHA-77"},
+		{"Fim da retenção", "2026-09-14T16:04:12-03:00"},
 		// O que o resumo já trazia continua igual.
 		{"Valor bruto", "48.00"},
 		{"Código", "E56B1AB8-91B0-427B-9059-EEEE1BD69BD9"},
@@ -130,7 +131,7 @@ func TestFetchSemDetalhesAvisaEDeixaAsColunasEmBranco(t *testing.T) {
 		t.Fatalf("Fetch: %v", err)
 	}
 	tab := res.Tables[0]
-	for _, coluna := range []string{"Parcelas", "Itens", "Última atualização", "Meio de pagamento (detalhe)"} {
+	for _, coluna := range []string{"Parcelas", "Itens", "Última atualização", "Meio de pagamento (detalhe)", "Fim da retenção"} {
 		if got := tab.Rows[0][colIndex(t, tab, coluna)]; got != "" {
 			t.Errorf("%s = %q, quero vazia com --sem-detalhes", coluna, got)
 		}
@@ -193,8 +194,9 @@ func TestFetchDetalhesToleraFalhaEmUmaTransacao(t *testing.T) {
 
 func TestMergeNaoSobrescreveOQueOResumoTrouxe(t *testing.T) {
 	resumo := transaction{Code: "DO-RESUMO", GrossAmount: "48.00"}
-	detalhe := transaction{Code: "DO-DETALHE", GrossAmount: "99.00", InstallmentCount: "4"}
+	detalhe := transaction{Code: "DO-DETALHE", GrossAmount: "99.00", InstallmentCount: "4", EscrowEndDate: "2026-09-14T16:04:12.000-03:00"}
 	detalhe.PaymentMethod.Code = "101"
+	detalhe.CreditorFees.IntermediationRateAmount = "0.40"
 
 	got := merge(resumo, detalhe)
 	if got.Code != "DO-RESUMO" || got.GrossAmount != "48.00" {
@@ -203,6 +205,91 @@ func TestMergeNaoSobrescreveOQueOResumoTrouxe(t *testing.T) {
 	if got.InstallmentCount != "4" || got.PaymentMethod.Code != "101" {
 		t.Errorf("o campo vazio não foi preenchido: %+v", got)
 	}
+	// Campo novo no detalhe que não entre na lista de pares do merge é campo
+	// buscado e jogado fora — o resumo nunca traz nenhum dos dois.
+	if got.EscrowEndDate == "" || got.CreditorFees.IntermediationRateAmount != "0.40" {
+		t.Errorf("fim da retenção ou taxa aberta não vieram do detalhe: %+v", got)
+	}
+}
+
+// TestFetchTaxasDetalhadasAbreATaxa cobre o caso completo: uma transação com o
+// bloco creditorFees e outra sem ele. A segunda é a que importa — o bloco não
+// foi confirmado numa conta real e a coluna precisa aguentar a ausência.
+func TestFetchTaxasDetalhadasAbreATaxa(t *testing.T) {
+	c, _, _ := comDetalhe(t, porCodigo(t))
+	c.TaxasDetalhadas = true
+
+	res, err := c.Fetch(context.Background(), periodo(t, "2026-08-01", "2026-08-30"))
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	tab := res.Tables[0]
+
+	casos := []struct{ coluna, want string }{
+		{"Tarifa fixa de intermediação", "0.40"},
+		{"Taxa de intermediação", "0.46"},
+		{"Taxa de parcelamento", "0.10"},
+		// A API mandou o bloco sem esse campo: célula vazia, não erro.
+		{"Taxa operacional", ""},
+		// A coluna do total continua vindo do resumo.
+		{"Taxa", "0.96"},
+	}
+	for _, cs := range casos {
+		if got := tab.Rows[0][colIndex(t, tab, cs.coluna)]; got != cs.want {
+			t.Errorf("%s = %q, quero %q", cs.coluna, got, cs.want)
+		}
+	}
+	// O PIX não trouxe creditorFees nenhum.
+	for _, coluna := range []string{"Tarifa fixa de intermediação", "Taxa de intermediação", "Taxa de parcelamento", "Taxa operacional"} {
+		if got := tab.Rows[1][colIndex(t, tab, coluna)]; got != "" {
+			t.Errorf("%s do PIX = %q, quero vazia: o detalhe não trouxe o bloco", coluna, got)
+		}
+	}
+	if len(res.Warnings) != 0 {
+		t.Errorf("avisos = %v, quero nenhum: uma das duas trouxe a taxa aberta", res.Warnings)
+	}
+}
+
+func TestFetchSemTaxasDetalhadasNaoCriaAsColunas(t *testing.T) {
+	c, _, _ := comDetalhe(t, porCodigo(t))
+
+	res, err := c.Fetch(context.Background(), periodo(t, "2026-08-01", "2026-08-30"))
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	for _, col := range res.Tables[0].Columns {
+		if strings.HasPrefix(col.Header, "Tarifa") || col.Header == "Taxa de intermediação" {
+			t.Errorf("coluna %q na planilha sem --taxas-detalhadas", col.Header)
+		}
+	}
+}
+
+func TestFetchAvisaQuandoATaxaAbertaNaoVeio(t *testing.T) {
+	c, _, _ := comDetalhe(t, func(w http.ResponseWriter, r *http.Request) {
+		// As duas transações respondem o detalhe do PIX, que não tem creditorFees.
+		w.Write(fixture(t, "detalhe-pix.xml"))
+	})
+	c.TaxasDetalhadas = true
+
+	res, err := c.Fetch(context.Background(), periodo(t, "2026-08-01", "2026-08-30"))
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	// Quatro colunas vazias sem explicação seriam lidas como defeito do programa.
+	if len(res.Warnings) != 1 || !strings.Contains(res.Warnings[0], "creditorFees") {
+		t.Errorf("avisos = %v, quero um dizendo que a API não mandou a taxa aberta", res.Warnings)
+	}
+}
+
+func TestGoldenCSVComTaxasDetalhadas(t *testing.T) {
+	c, _, _ := comDetalhe(t, porCodigo(t))
+	c.TaxasDetalhadas = true
+
+	res, err := c.Fetch(context.Background(), periodo(t, "2026-08-01", "2026-08-30"))
+	if err != nil {
+		t.Fatalf("Fetch: %v", err)
+	}
+	conferirGolden(t, res.Tables[0], "transacoes-taxas.csv")
 }
 
 func TestGoldenCSVComDetalhes(t *testing.T) {
@@ -213,12 +300,21 @@ func TestGoldenCSVComDetalhes(t *testing.T) {
 		t.Fatalf("Fetch: %v", err)
 	}
 
+	conferirGolden(t, res.Tables[0], "transacoes-detalhes.csv")
+}
+
+// conferirGolden compara a tabela com os bytes exatos gravados em testdata —
+// BOM e CRLF inclusive, que são o que prova que o CSV ainda abre no Excel com
+// um duplo clique.
+func conferirGolden(t *testing.T, tab sheet.Table, nome string) {
+	t.Helper()
+
 	var buf bytes.Buffer
-	if err := sheet.Write(&buf, res.Tables[0], sheet.DefaultOptions()); err != nil {
+	if err := sheet.Write(&buf, tab, sheet.DefaultOptions()); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	golden := filepath.Join("testdata", "transacoes-detalhes.csv")
+	golden := filepath.Join("testdata", nome)
 	if *update {
 		if err := os.WriteFile(golden, buf.Bytes(), 0o644); err != nil {
 			t.Fatal(err)

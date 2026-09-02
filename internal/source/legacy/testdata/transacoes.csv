@@ -1,4 +1,4 @@
-﻿Data;Última atualização;Código;Referência;Tipo;Tipo (código);Status;Status (código);Meio de pagamento;Meio de pagamento (código);Meio de pagamento (detalhe);Valor bruto;Desconto;Taxa;Valor líquido;Valor extra;Parcelas;Itens
-03/08/2026 15:46:12;05/08/2026 17:39:14;9E884542-81B3-4419-9A75-BCC6FB495EF1;PEDIDO-1024;Pagamento;1;Paga;3;Cartão de crédito;1;101;1499,90;0,00;59,86;1440,04;0,00;3;2
-04/08/2026 09:01:00;04/08/2026 09:01:30;A1B2C3D4-0000-4444-8888-FFFFFFFFFFFF;Manutenção de serviço - código ÚNICO;código 11;11;Retenção temporária;9;Boleto;2;202;89,00;9,00;1,99;78,01;-0,01;1;1
-20/08/2026 23:59:59;21/08/2026 00:00:05;DEADBEEF-1111-2222-3333-444455556666;;código 4;4;Disponível;4;Depósito em conta;7;;-500,00;0,00;0,00;-500,00;0,00;1;0
+﻿Data;Última atualização;Fim da retenção;Código;Referência;Tipo;Tipo (código);Status;Status (código);Meio de pagamento;Meio de pagamento (código);Meio de pagamento (detalhe);Valor bruto;Desconto;Taxa;Valor líquido;Valor extra;Parcelas;Itens
+03/08/2026 15:46:12;05/08/2026 17:39:14;;9E884542-81B3-4419-9A75-BCC6FB495EF1;PEDIDO-1024;Pagamento;1;Paga;3;Cartão de crédito;1;101;1499,90;0,00;59,86;1440,04;0,00;3;2
+04/08/2026 09:01:00;04/08/2026 09:01:30;;A1B2C3D4-0000-4444-8888-FFFFFFFFFFFF;Manutenção de serviço - código ÚNICO;código 11;11;Retenção temporária;9;Boleto;2;202;89,00;9,00;1,99;78,01;-0,01;1;1
+20/08/2026 23:59:59;21/08/2026 00:00:05;;DEADBEEF-1111-2222-3333-444455556666;;código 4;4;Disponível;4;Depósito em conta;7;;-500,00;0,00;0,00;-500,00;0,00;1;0

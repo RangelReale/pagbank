@@ -14,6 +14,7 @@
   <feeAmount>2.48</feeAmount>
   <netAmount>494.16</netAmount>
   <extraAmount>0.00</extraAmount>
+  <escrowEndDate>2026-09-14T16:31:02.000-03:00</escrowEndDate>
   <installmentCount>1</installmentCount>
   <itemCount>1</itemCount>
 </transaction>

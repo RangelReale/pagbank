@@ -12,9 +12,15 @@
   </paymentMethod>
   <grossAmount>48.00</grossAmount>
   <discountAmount>0.00</discountAmount>
+  <creditorFees>
+    <installmentFeeAmount>0.10</installmentFeeAmount>
+    <intermediationRateAmount>0.40</intermediationRateAmount>
+    <intermediationFeeAmount>0.46</intermediationFeeAmount>
+  </creditorFees>
   <feeAmount>0.96</feeAmount>
   <netAmount>47.04</netAmount>
   <extraAmount>0.00</extraAmount>
+  <escrowEndDate>2026-09-14T16:04:12.000-03:00</escrowEndDate>
   <installmentCount>4</installmentCount>
   <itemCount>1</itemCount>
 </transaction>

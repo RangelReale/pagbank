@@ -59,9 +59,15 @@ type Client struct {
 	Token   string
 	// SemDetalhes pula a consulta de detalhe de cada transação. A busca por data
 	// devolve só um resumo: última atualização, código do meio de pagamento,
-	// parcelas e itens existem apenas em /v2/transactions/{código}, e buscá-los
-	// custa uma requisição por transação. Pular deixa essas colunas em branco.
+	// parcelas, itens e fim da retenção existem apenas em
+	// /v2/transactions/{código}, e buscá-los custa uma requisição por transação.
+	// Pular deixa essas colunas em branco.
 	SemDetalhes bool
+	// TaxasDetalhadas acrescenta as quatro colunas do bloco creditorFees do
+	// detalhe — a taxa aberta nas parcelas que a compõem. É opcional porque só
+	// interessa a quem confere tarifa: para o resto, a coluna "Taxa" com o total
+	// basta, e quatro colunas a mais só atrapalhariam a leitura da planilha.
+	TaxasDetalhadas bool
 	// Logf, quando definido, reporta o progresso (janela e página).
 	Logf func(format string, args ...any)
 	// ProgressoDetalhe, quando definido, informa o avanço da segunda passada.
@@ -129,7 +135,7 @@ func (c *Client) Fetch(ctx context.Context, p source.Period) (*source.Result, er
 
 	b := sheet.NewBuilder(TableName)
 	for _, t := range txs {
-		appendTransaction(b, t)
+		appendTransaction(b, t, c.TaxasDetalhadas)
 	}
 	res.Tables = []sheet.Table{b.Build()}
 	return res, nil
@@ -184,9 +190,12 @@ func (c *Client) detalhar(ctx context.Context, txs []transaction, res *source.Re
 		return nil
 	}
 	if c.SemDetalhes {
-		res.Warnf("sem o detalhe das transações, as colunas de última atualização, detalhe do meio " +
-			"de pagamento, parcelas e itens saem em branco: a consulta por data devolve só um " +
-			"resumo de cada transação")
+		colunas := "última atualização, detalhe do meio de pagamento, parcelas, itens e fim da retenção"
+		if c.TaxasDetalhadas {
+			colunas += ", mais as quatro de taxa detalhada"
+		}
+		res.Warnf("sem o detalhe das transações, as colunas de %s saem em branco: a consulta "+
+			"por data devolve só um resumo de cada transação", colunas)
 		return nil
 	}
 
@@ -217,7 +226,25 @@ func (c *Client) detalhar(ctx context.Context, txs []transaction, res *source.Re
 	if falhas > 0 {
 		res.Warnf("%d transação(ões) ficaram sem detalhe e mantiveram só os dados do resumo; a primeira falha foi: %v", falhas, primeira)
 	}
+	if c.TaxasDetalhadas && !algumaTaxaDetalhada(txs) {
+		res.Warnf("as colunas de taxa detalhada saíram vazias: o detalhe não trouxe o bloco creditorFees em nenhuma das %d transações", len(txs))
+	}
 	return nil
+}
+
+// algumaTaxaDetalhada diz se ao menos uma transação trouxe algum valor de
+// creditorFees. O bloco não foi confirmado numa conta real e não consta da
+// documentação de todos os meios de pagamento: sem essa checagem, quatro
+// colunas vazias pareceriam defeito do programa em vez de omissão da API.
+func algumaTaxaDetalhada(txs []transaction) bool {
+	for _, t := range txs {
+		f := t.CreditorFees
+		if f.IntermediationRateAmount != "" || f.IntermediationFeeAmount != "" ||
+			f.InstallmentFeeAmount != "" || f.OperationalFeeAmount != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // merge completa o resumo com o detalhe campo a campo, sem sobrescrever nada que
@@ -240,6 +267,11 @@ func merge(resumo, detalhe transaction) transaction {
 		{&resumo.ExtraAmount, &detalhe.ExtraAmount},
 		{&resumo.InstallmentCount, &detalhe.InstallmentCount},
 		{&resumo.ItemCount, &detalhe.ItemCount},
+		{&resumo.EscrowEndDate, &detalhe.EscrowEndDate},
+		{&resumo.CreditorFees.IntermediationRateAmount, &detalhe.CreditorFees.IntermediationRateAmount},
+		{&resumo.CreditorFees.IntermediationFeeAmount, &detalhe.CreditorFees.IntermediationFeeAmount},
+		{&resumo.CreditorFees.InstallmentFeeAmount, &detalhe.CreditorFees.InstallmentFeeAmount},
+		{&resumo.CreditorFees.OperationalFeeAmount, &detalhe.CreditorFees.OperationalFeeAmount},
 	} {
 		if *par[0] == "" {
 			*par[0] = *par[1]
@@ -406,15 +438,33 @@ type transaction struct {
 	ExtraAmount      string `xml:"extraAmount"`
 	InstallmentCount string `xml:"installmentCount"`
 	ItemCount        string `xml:"itemCount"`
+	// EscrowEndDate é o fim da retenção: quando o valor deixa de estar retido e
+	// é liberado. Só existe no detalhe.
+	EscrowEndDate string `xml:"escrowEndDate"`
+	// CreditorFees é a taxa aberta nas parcelas que a compõem. Também só existe
+	// no detalhe e, nos exemplos da documentação, aparece no lugar de feeAmount
+	// e não ao lado dele — por isso a coluna "Taxa" continua vindo do resumo,
+	// que é o dado autoritativo de qualquer forma.
+	CreditorFees struct {
+		IntermediationRateAmount string `xml:"intermediationRateAmount"`
+		IntermediationFeeAmount  string `xml:"intermediationFeeAmount"`
+		InstallmentFeeAmount     string `xml:"installmentFeeAmount"`
+		OperationalFeeAmount     string `xml:"operationalFeeAmount"`
+	} `xml:"creditorFees"`
 }
 
 // appendTransaction transcreve uma transação para a planilha. O código cru fica
 // numa coluna própria ao lado da descrição: ele é o dado autoritativo, a
 // descrição é conveniência (veja codigos.go).
-func appendTransaction(b *sheet.Builder, t transaction) {
+//
+// As colunas ficam agrupadas por assunto — as datas juntas, as taxas junto do
+// total —, e por isso as de creditorFees entram no meio da linha: a ordem das
+// colunas do CSV é a ordem de primeira aparição dos Set.
+func appendTransaction(b *sheet.Builder, t transaction, taxasDetalhadas bool) {
 	b.StartRow()
 	b.Set("Data", sheet.KindDateTime, normalizeTime(t.Date))
 	b.Set("Última atualização", sheet.KindDateTime, normalizeTime(t.LastEventDate))
+	b.Set("Fim da retenção", sheet.KindDateTime, normalizeTime(t.EscrowEndDate))
 	b.Set("Código", sheet.KindText, t.Code)
 	b.Set("Referência", sheet.KindText, t.Reference)
 	b.Set("Tipo", sheet.KindText, describe(tipos, t.Type))
@@ -427,6 +477,12 @@ func appendTransaction(b *sheet.Builder, t transaction) {
 	b.Set("Valor bruto", sheet.KindNumber, t.GrossAmount)
 	b.Set("Desconto", sheet.KindNumber, t.DiscountAmount)
 	b.Set("Taxa", sheet.KindNumber, t.FeeAmount)
+	if taxasDetalhadas {
+		b.Set("Tarifa fixa de intermediação", sheet.KindNumber, t.CreditorFees.IntermediationRateAmount)
+		b.Set("Taxa de intermediação", sheet.KindNumber, t.CreditorFees.IntermediationFeeAmount)
+		b.Set("Taxa de parcelamento", sheet.KindNumber, t.CreditorFees.InstallmentFeeAmount)
+		b.Set("Taxa operacional", sheet.KindNumber, t.CreditorFees.OperationalFeeAmount)
+	}
 	b.Set("Valor líquido", sheet.KindNumber, t.NetAmount)
 	b.Set("Valor extra", sheet.KindNumber, t.ExtraAmount)
 	b.Set("Parcelas", sheet.KindNumber, t.InstallmentCount)

@@ -135,14 +135,23 @@
         <input type="radio" name="modo" value="completa" checked>
         <span style="color:var(--tinta);font-weight:600">Completa (recomendada)
           <span>Busca o detalhe de cada venda. Traz parcelas, itens, última
-            atualização e o meio de pagamento detalhado — mas leva alguns minutos
-            num mês de muitas vendas.</span></span>
+            atualização, fim da retenção e o meio de pagamento detalhado — mas
+            leva alguns minutos num mês de muitas vendas.</span></span>
       </label>
       <label class="escolha">
         <input type="radio" name="modo" value="rapida">
         <span style="color:var(--tinta);font-weight:600">Rápida
-          <span>Termina em segundos, mas quatro colunas saem em branco: última
-            atualização, meio de pagamento (detalhe), parcelas e itens.</span></span>
+          <span>Termina em segundos, mas cinco colunas saem em branco: última
+            atualização, meio de pagamento (detalhe), parcelas, itens e fim da
+            retenção.</span></span>
+      </label>
+      <label class="escolha" style="margin-top:.9rem;padding-top:.9rem;border-top:1px solid var(--linha)">
+        <input type="checkbox" id="taxas">
+        <span style="color:var(--tinta);font-weight:600">Abrir a taxa em quatro colunas
+          <span>Acrescenta tarifa fixa de intermediação, taxa de intermediação,
+            taxa de parcelamento e taxa operacional ao lado da coluna Taxa. Só
+            funciona no modo Completa, e o PagBank nem sempre manda esses
+            valores — quando não manda, as colunas saem vazias.</span></span>
       </label>
     </fieldset>
 
@@ -267,8 +276,9 @@
     cronometro = setInterval(tique, 1000);
 
     var detalhes = document.querySelector("input[name=modo]:checked").value === "completa" ? "1" : "0";
+    var taxas = q("taxas").checked ? "1" : "0";
     fluxo = new EventSource("/extrair?t=" + encodeURIComponent(TOKEN) +
-      "&de=" + de + "&ate=" + ate + "&detalhes=" + detalhes);
+      "&de=" + de + "&ate=" + ate + "&detalhes=" + detalhes + "&taxas=" + taxas);
 
     fluxo.addEventListener("progresso", function (e) {
       var d = JSON.parse(e.data);

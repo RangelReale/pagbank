@@ -740,3 +740,29 @@ func TestWatchdogVoltaDepoisDeAdiarPorExtracao(t *testing.T) {
 		t.Fatal("o watchdog não voltou depois que a extração terminou: processo órfão")
 	}
 }
+
+// TestPedidoDaQueryLeAsEscolhas pina os dois padrões, que são opostos: a
+// planilha completa é o que o usuário espera, e a taxa aberta é o que só quem
+// confere tarifa quer ver.
+func TestPedidoDaQueryLeAsEscolhas(t *testing.T) {
+	casos := []struct {
+		nome            string
+		query           string
+		semDetalhes     bool
+		taxasDetalhadas bool
+	}{
+		{"sem nada", "", false, false},
+		{"completa", "detalhes=1", false, false},
+		{"rápida", "detalhes=0", true, false},
+		{"com a taxa aberta", "detalhes=1&taxas=1", false, true},
+		{"caixa desmarcada", "detalhes=1&taxas=0", false, false},
+	}
+	for _, cs := range casos {
+		t.Run(cs.nome, func(t *testing.T) {
+			p := pedidoDaQuery(httptest.NewRequest(http.MethodGet, "/extrair?"+cs.query, nil))
+			if p.SemDetalhes != cs.semDetalhes || p.TaxasDetalhadas != cs.taxasDetalhadas {
+				t.Errorf("%+v, quero SemDetalhes=%v TaxasDetalhadas=%v", p, cs.semDetalhes, cs.taxasDetalhadas)
+			}
+		})
+	}
+}

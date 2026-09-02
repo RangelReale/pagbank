@@ -160,11 +160,12 @@ func runEDI(ctx context.Context, args []string) error {
 
 func runLegacy(ctx context.Context, args []string) error {
 	var o opts
-	var semDetalhes bool
+	var semDetalhes, taxasDetalhadas bool
 
 	fs := flag.NewFlagSet("transacoes", flag.ContinueOnError)
 	o.bind(fs)
-	fs.BoolVar(&semDetalhes, "sem-detalhes", false, "pula o detalhe de cada transação: fica muito mais rápido, mas parcelas, itens, última atualização e o detalhe do meio de pagamento saem em branco")
+	fs.BoolVar(&semDetalhes, "sem-detalhes", false, "pula o detalhe de cada transação: fica muito mais rápido, mas parcelas, itens, última atualização, fim da retenção e o detalhe do meio de pagamento saem em branco")
+	fs.BoolVar(&taxasDetalhadas, "taxas-detalhadas", false, "acrescenta quatro colunas com a taxa aberta (tarifa fixa de intermediação, intermediação, parcelamento e operacional); depende do detalhe, então não vale com --sem-detalhes")
 	fs.Usage = func() { usageLegacy(fs) }
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -189,6 +190,7 @@ func runLegacy(ctx context.Context, args []string) error {
 
 	c := legacy.New(cred, hc)
 	c.SemDetalhes = semDetalhes
+	c.TaxasDetalhadas = taxasDetalhadas
 	c.Logf = o.logger()
 
 	return extrair(ctx, c, p, o)
@@ -289,6 +291,7 @@ Exemplos:
   pagbank-extract edi --from 2026-08-01 --types financial,balances --out ./agosto
   pagbank-extract transacoes --from 2026-08-01 -v
   pagbank-extract transacoes --from 2026-08-01 --sem-detalhes
+  pagbank-extract transacoes --from 2026-08-01 --taxas-detalhadas
 
 Rode "pagbank-extract <comando> -h" para as flags de cada comando.
 Como obter cada credencial: veja o README.md.
@@ -320,10 +323,11 @@ Extrai as vendas pela API legada, em um único CSV. A API limita cada consulta a
 automaticamente.
 
 A consulta por data devolve só um resumo de cada transação: parcelas, itens,
-última atualização e o detalhe do meio de pagamento não vêm nela. Por isso cada
-transação é buscada também pelo código, o que custa uma requisição a mais por
-transação — conte alguns minutos num mês de muitas vendas. Com --sem-detalhes
-essa segunda passada é pulada e essas quatro colunas saem em branco.
+última atualização, fim da retenção e o detalhe do meio de pagamento não vêm
+nela. Por isso cada transação é buscada também pelo código, o que custa uma
+requisição a mais por transação — conte alguns minutos num mês de muitas vendas.
+Com --sem-detalhes essa segunda passada é pulada e essas cinco colunas saem em
+branco.
 
 Flags:
 `, legacy.MaxWindowDays, legacy.MaxHistoryMonths)

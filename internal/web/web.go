@@ -50,12 +50,13 @@ const (
 	intervaloDoBatimento = 15 * time.Second
 )
 
-// Pedido é o que a página manda: um período e a escolha de buscar ou não o
-// detalhe de cada venda.
+// Pedido é o que a página manda: um período, a escolha de buscar ou não o
+// detalhe de cada venda e a de abrir a taxa em quatro colunas.
 type Pedido struct {
-	De          string
-	Ate         string
-	SemDetalhes bool
+	De              string
+	Ate             string
+	SemDetalhes     bool
+	TaxasDetalhadas bool
 }
 
 // Fabrica monta a fonte de uma extração. É um campo de Opcoes para que o teste
@@ -74,6 +75,7 @@ func FabricaLegada(cred config.Legacy, p Pedido, logf func(string, ...any), prog
 
 	c := legacy.New(cred, hc)
 	c.SemDetalhes = p.SemDetalhes
+	c.TaxasDetalhadas = p.TaxasDetalhadas
 	c.Logf = logf
 	c.ProgressoDetalhe = progresso
 	return c
@@ -396,6 +398,9 @@ func pedidoDaQuery(r *http.Request) Pedido {
 		// O padrão é buscar o detalhe: a planilha completa é a que o usuário
 		// espera, e quem escolhe a rápida escolheu conscientemente.
 		SemDetalhes: q.Get("detalhes") == "0",
+		// A taxa aberta é o contrário: quatro colunas que só quem confere tarifa
+		// quer ver, então só entram quando a caixa foi marcada.
+		TaxasDetalhadas: q.Get("taxas") == "1",
 	}
 }
 

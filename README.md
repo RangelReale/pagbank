@@ -95,7 +95,8 @@ Na máquina de quem vai usar, basta o executável — não há nada para instala
    `config.env` terá aparecido na mesma pasta, em branco e comentado. Abra,
    preencha `PAGBANK_EMAIL` e `PAGBANK_TOKEN` (o mesmo token do painel descrito
    acima), salve e recarregue a página.
-4. Escolha as datas e clique em **Gerar planilha**. O CSV aparece na pasta do
+4. Escolha as datas e clique em **Gerar planilha**. Se você confere tarifa,
+   marque também **Abrir a taxa em quatro colunas**. O CSV aparece na pasta do
    executável, com a data e a hora no nome —
    `transacoes-2026-09-01_143022.csv` —, então uma extração nunca apaga a
    anterior nem esbarra numa planilha ainda aberta no Excel.
@@ -144,6 +145,9 @@ pagbank-extract transacoes --from 2026-08-25 -v
 
 # Só o resumo das vendas, sem a segunda passada de detalhe — bem mais rápido
 pagbank-extract transacoes --from 2026-08-25 --sem-detalhes
+
+# Com a taxa aberta nas quatro parcelas que a compõem
+pagbank-extract transacoes --from 2026-08-25 --taxas-detalhadas
 ```
 
 `--to` é opcional e vale hoje. `--out` é opcional e vale `saida/`.
@@ -160,12 +164,13 @@ Rode `pagbank-extract help`, ou `pagbank-extract edi -h`, para todas as flags.
 
 ### O detalhe das transações
 
-A consulta por data da API legada devolve um **resumo** de cada transação. Quatro campos não
+A consulta por data da API legada devolve um **resumo** de cada transação. Cinco campos não
 vêm nela e só existem em `/v2/transactions/{código}`:
 
 | Coluna do CSV | Campo da API |
 |---|---|
 | Última atualização | `lastEventDate` |
+| Fim da retenção | `escrowEndDate` |
 | Meio de pagamento (detalhe) | `paymentMethod/code` |
 | Parcelas | `installmentCount` |
 | Itens | `itemCount` |
@@ -175,7 +180,27 @@ essas colunas. Custa uma requisição a mais por transação, espaçadas para n�
 da API: conte alguns minutos num mês de muitas vendas.
 
 `--sem-detalhes` pula essa segunda passada. A extração fica na velocidade de uma requisição por
-página de mil transações, e as quatro colunas acima saem em branco — com um aviso dizendo isso.
+página de mil transações, e as cinco colunas acima saem em branco — com um aviso dizendo isso.
+
+#### A taxa aberta
+
+O detalhe também traz, no bloco `creditorFees`, a taxa desmembrada nas parcelas que a compõem.
+`--taxas-detalhadas` — ou a caixa **Abrir a taxa em quatro colunas**, na interface web —
+acrescenta as quatro ao lado da coluna `Taxa`, que continua trazendo o total:
+
+| Coluna do CSV | Campo da API |
+|---|---|
+| Tarifa fixa de intermediação | `creditorFees/intermediationRateAmount` |
+| Taxa de intermediação | `creditorFees/intermediationFeeAmount` |
+| Taxa de parcelamento | `creditorFees/installmentFeeAmount` |
+| Taxa operacional | `creditorFees/operationalFeeAmount` |
+
+Não custa requisição nenhuma: o bloco já vem na mesma resposta de detalhe. Fica opcional porque
+quatro colunas a mais só interessam a quem confere tarifa. **Nada disso foi confirmado numa
+conta real** — o bloco não aparece na documentação de todos os meios de pagamento, e a API pode
+simplesmente não mandá-lo. Quando isso acontece as colunas saem vazias, com um aviso dizendo
+que o `creditorFees` não veio em nenhuma transação. É a mesma postura da tabela de códigos: a
+aplicação não inventa dado nem finge que a ausência é um erro.
 
 Uma transação cujo detalhe falhe não derruba a extração nem some do CSV: a linha fica com o que
 o resumo trouxe, e o total de falhas vira aviso no fim.
@@ -227,6 +252,9 @@ Em ambos os casos **a coluna com o valor cru é a autoritativa**: nada é descar
 - `transações repetidas descartadas` — a paginação da API legada corre sobre dados vivos, e a
   mesma transação pode reaparecer em outra página. A deduplicação é pelo código da transação.
 - `sem o detalhe das transações, as colunas ... saem em branco` — `--sem-detalhes` foi usado.
+- `as colunas de taxa detalhada saíram vazias` — `--taxas-detalhadas` foi usado, mas a API não
+  mandou o bloco `creditorFees` em nenhuma transação. A taxa total, na coluna `Taxa`, continua
+  valendo.
 - `N transação(ões) ficaram sem detalhe` — a consulta do detalhe falhou para essas; as linhas
   ficaram com os dados do resumo. Rodar de novo costuma resolver.
 - `o período termina no futuro` — a API legada não responde por datas futuras, e o resto do dia

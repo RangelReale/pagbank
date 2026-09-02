@@ -146,6 +146,15 @@ Invariantes que só aparecem lendo vários arquivos:
   hoje ainda é futuro e a API recusa a consulta inteira com o código `13009`.
 - As datas vão no fuso de Brasília, fixo (`var brasilia`), porque a API não aceita deslocamento na
   query e o Brasil não tem horário de verão desde 2019.
+- **`transactionDetail` é a struct do resumo com outro `XMLName`.** O endpoint de detalhe devolve
+  bem mais do que ela declara — `sender`, `items`, `shipping`, `gatewaySystem`, `paymentLink` —,
+  e o `encoding/xml` descarta tudo em silêncio. Campo novo do detalhe custa **duas** mudanças:
+  entrar na struct *e* virar um par novo em `merge`. Só a primeira, e o campo é buscado e jogado
+  fora — o resumo nunca traz nenhum deles, então é sempre o `merge` que os carrega para a linha.
+- **`creditorFees` nunca foi confirmado numa conta real.** Vale para ele a regra do `codigos.go`:
+  em vez de fingir que a ausência é erro, `algumaTaxaDetalhada` avisa quando a API não mandou o
+  bloco em nenhuma transação. Nos exemplos da documentação ele aparece *no lugar* de `feeAmount`,
+  e não ao lado — por isso a coluna `Taxa` continua vindo do resumo.
 
 ## Armadilhas da interface web (já resolvidas — não desfaça)
 
